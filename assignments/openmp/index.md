@@ -53,7 +53,7 @@ Remember the job ID printed by `condor_submit`, such as `12345.0`. To see whethe
 condor_q NETID
 ```
 
-5 - Write another script that evaluates the performance of the benchmark
+5 - Evaluate the performance of the benchmark
 on 64 cores as SIZE starts small and increases by powers of two.
 Stop if your runtime exceeds 30 minutes on 64 cores.
 As above, run these jobs on the cluster, not the front end node.
