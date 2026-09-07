@@ -1,3 +1,17 @@
+/*
+Benchmark: Matrix Multiplication
+
+Perform a multiplication of two random matrices, A and B,
+such that each cell in the result C is the dot-product
+of a row from A and a column from B.
+
+The multiplication is coded in the most direct way,
+which is three nested for-loops, resulting in an O(n^3)
+algorithm.  There are many opportunities here to accelerate
+the code by improving data layout, access patterns,
+SIMD instructions, and parallelism with OpenMP.
+*/
+
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>

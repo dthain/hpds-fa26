@@ -1,3 +1,19 @@
+/*
+Benchmark: Mandelbrot Fractal
+
+Compute an image of the Mandelbrot fractal in the complex plane.
+For each pixel in a SIZE x SIZE array, run the escape time algorithm
+with a maximum of ITER iterations, then color that pixel according
+to the number of iterations.
+
+Note that the image is written out in the (simple) PNM file format.
+You can display this image with the `eog` tool on Linux, or use
+`convert` to convert it into a png or more convenient style.
+
+The fractal computation is "pleasantly parallel" in that each
+pixel can be computed independently without data sharing.
+*/
+
 
 #include <stdlib.h>
 #include <stdio.h>
