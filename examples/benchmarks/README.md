@@ -52,7 +52,7 @@ of placing N queens on an NxN chessboard.  SIZE is the dimension
 of the chessboard.  (ITER is not used.)
 
 <table>
-<th>
+<tr>
 <td>Fractal
 <td>N-Body
 <td>Heat
