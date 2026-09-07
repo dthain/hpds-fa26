@@ -26,15 +26,17 @@ void grid_clear( matrix_t A )
 
 /*
 Set up some interesting boundary conditions on a grid.
-Set the top border to 25C, and the bottom to 0.
+Set the outside borders to 25C.
 Then place a half-circle in the middle at 100C.
 */
 
 void grid_boundary_conditions( matrix_t A )
 {
 	for(int i=0;i<SIZE;i++) {
+		A[0][i] = 25.0;
+		A[SIZE-1][i] = 25.0;
 		A[i][0] = 25.0;
-		A[i][SIZE-1] = 0.0;
+		A[i][SIZE-1] = 25.0;
 	}
 
 	double radius = SIZE/4;
