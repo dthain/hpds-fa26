@@ -57,9 +57,9 @@ of the chessboard.  (ITER is not used.)
 <td>N-Body
 <td>Heat
 <tr>
-<td><img src=images/fractal.png>
-<td><img src=images/nbody.png>
-<td><img src=images/heat.png>
+<td><img width=1024px src=images/fractal.png>
+<td><img width=1024px src=images/nbody.png>
+<td><img width=1024px src=images/heat.png>
 </table>
 
 
