@@ -155,10 +155,9 @@ void nbody_timestep()
 	}
 
 	/* For each pair of bodies, compute force interactions. */
-	
+
 	for(int i=0; i<SIZE; i++) {
-		for(int j=0; j<SIZE; j++) {
-			if(i==j) continue;
+		for(int j=0; j<i; j++) {
 			nbody_interact(&B[i],&B[j]);
 		}
 	}
