@@ -1,25 +1,54 @@
+/*
+Benchmark: N-Body Simulation
+
+Simulate the motion of N Newtonion bodies through 2D space.
+Each body has a given mass, location, velocity, and accleration.
+Each is attracted to all others via Newton's law of gravitation:
+    F = G*m1*m2/r^2.
+
+As you may know, there is no general closed form solution
+for three or more bodies interacting with each other.
+However, we can approximate by computing the total force
+on each body at a given timestep, and from there integrate
+acceleration to velocity to position over a short timestep deltat.
+However, small errors will accumulate at each timestep.
+
+Every 1000 timesteps, the code will print out the current X-Y
+position of each object on a single line.  You can feed these
+into a plot in order to view the positions of bodies.
+You may want to increase this number if it is affecting performance.
+
+There are two computational problems here:
+1 - The smaller the delta-t, the more accurate the simulation,
+but the slower it runs (in real time).
+2 - There are N^2 interactions to compute between N bodies,
+and so the simulation runs much slower with more bodies.
+
+As with the other benchmarks, this is a naive implementation
+in order to reveal the essential problems.  You can improve
+this benchmark by improving the data structures, parallelizing
+with SIMD operations, parallelizing with OpenMP, etc.
+*/
+
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
 #ifndef SIZE
-#define SIZE 100
+#define SIZE 10
 #endif
 
 #ifndef ITER
-#define ITER 10000
+#define ITER 100000
 #endif
 
-#define G 10000000
+#ifndef DELTAT
+#define DELTAT 0.01
+#endif
 
-/*
-NOTE: I have deliberately taken an "unsophisticated" approach
-to setting up these structures.  You are welcome to extend
-to three dimensions, rewrite using C++ vectors, rearrange
-the memory layout, or whatever else makes you happy or
-improves the performance.  Go nuts.
-*/
+/* Netwon's gravitational constant. */
+#define G 6.6743e-11
 
 /* Define the properties of a Newtonian body. */
 
@@ -30,8 +59,9 @@ struct body {
 	double mass;	// mass (kg)
 };
 
+/* The array of all Newtonian bodies. */
+
 struct body B[SIZE];
-double deltat = 0.01;
 
 /* Initialize one body with a random location, velocity, mass, and zero accel. */
 
@@ -40,13 +70,14 @@ void nbody_init( struct body *b )
 	b->x = rand()%1000;
 	b->y = rand()%1000;
 
-	b->vx = rand()%200-100.0;
-	b->vy = rand()%200-100.0;
-
+	b->vx = (rand()%20-10.0)/100.0;
+	b->vy = (rand()%20-10.0)/100.0;
+	
 	b->ax = 0;
 	b->ay = 0;
 
-	b->mass = (1+rand()%10) / 1000.0;
+	/* Note masses have to be very large to be affected by G! */
+	b->mass = (1+rand()%10) * 1e12;
 }
 
 /* Display the position of all bodies in an array. */
@@ -135,7 +166,7 @@ void nbody_timestep()
 	/* Move each body according to accumulated acceleration. */
 	
 	for(int i=0; i<SIZE; i++) {
-		nbody_move(&B[i],deltat);
+		nbody_move(&B[i],DELTAT);
 	}
 }
 
@@ -166,8 +197,10 @@ int main( int argc, char *argv[] )
 
 	for(int k=0; k<ITER; k++) {
 		nbody_timestep();
-		
-		if(i%1000==0) nbody_print_all(B);
+
+		/* Print body locations every 1000 timesteps */
+		if(k%1000==0) nbody_print_all(B);
+		nbody_print_all(B);
 	}
 
 	/* Mark the stop of the experiment. */

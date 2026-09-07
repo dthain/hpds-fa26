@@ -1,3 +1,34 @@
+/*
+Benchmark: Heat Transfer
+
+This program performs a simple 2D heat transfer simulation.
+A half-circle object in the middle of the field is maintained
+at 100C, while the boundaries of the field are maintained at 25C.
+Heat propagates from the object to the surrounding field according
+to Fourier's law (Q = m*c*dT/dx), which essentially states that
+heat transfer is proportional to temperature difference.
+
+The simulation is a grid of points, each tracking the current
+temperature at that point.  Assuming a constant material throughout
+the field, the new temperature can be computed as the average
+of the current point with its neighbors.
+
+However, we cannot just update each cell of one array iteratively,
+because the computations at each point would interfere with each other.
+Instead, we maintain a current grid (A) and a next grid (B).
+The temperature at each point in the B grid is computed from the values
+in the A grid, allowing each point to be independent.
+
+The final field is emitted as a PNM image, which can be viewed with
+`eog` or converted into a PNG with `convert`.
+
+As with the other benchmarks, this is the simplest possible formulation
+of the problem.  You could make the simulation more realistic by adding
+different material types, extending to 3 dimensions, etc.  And, you
+can accelerate by reorganizing data structures, exploiting SIMD instructions,
+parallelizing with OpenMP, etc...
+*/
+
 #include <stdio.h>
 #include <math.h>
 #include <sys/time.h>
