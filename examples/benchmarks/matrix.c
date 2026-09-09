@@ -54,7 +54,7 @@ void matrix_random( matrix_t m )
 
 double matrix_addup( matrix_t m )
 {
-	double total;
+	double total = 0;
 	for(int i=0; i<SIZE; i++) {
 		for(int j=0; j<SIZE; j++) {
 			total += m[i][j];
