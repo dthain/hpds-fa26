@@ -6,13 +6,16 @@ First review the [general instructions](../../general) for assignments.
 Select three interesting OpenMP directives that we didn't discuss in class.
 Describe each one in a paragraph that describes what it does, why it is interesting, and how you might use it.
 
-2 - Explore the [benchmarks](https://github.com/dthain/hpds-fa26/tree/main/examples/benchmarks)
-presented in class.  Select one of the benchmark codes (except fractal) to work with, and read it carefully
-to understand the fundamental operation.  Adjust SIZE, ITER, DELTAT so that the benchmark
-runs in about 60s on a single core, without excessive output.
 
-3 - Create an improved version of this benchmark that uses OpenMP for parallelization.
-Be creative and make use of appropriate directives and capabilities that we did not discuss in class.
+2 - Explore the [benchmarks](https://github.com/dthain/hpds-fa26/tree/main/examples/benchmarks) presented in class.  Select *three* benchmarks to evaluate.  One must be **fractal**, one must be chosen from (matrix, heat) and the other from (nbody, nqueens). For each benchmark, do the following:
+
+3 - Establish a baseline.  Read the code to understand the fundamental operation.
+Adjust SIZE, ITER, DELTAT so that the benchmark runs in about 60s on a single core.
+Make any adjustments needed to avoid excessive output.
+
+4 - Create an improved version of the benchmark that uses OpenMP for parallelization.
+Be creative and make use of appropriate directives and capabilities,
+going beyond what we discussed in class.
 Take care to understand which data should be private/shared within threads.
 Test your solution using **1 to 4 threads** (but no more) on the CRC Front End machine.
 Double check that the parallelized version produces correct output.
@@ -22,7 +25,7 @@ Compile with `-fopenmp` to enable OpenMP, for example (replace `benchmark.c` wit
 g++ -O1 -fopenmp benchmark.c -o benchmark -lm
 ```
 
-4 - Evaluate the performance of the benchmark on 1-64 cores, but 
+5 - Evaluate the performance of the benchmark on 1-64 cores, but 
 **don't run on the front end**.  Instead, submit each execution
 using HTCondor, so that the job runs on a node in the cluster.
 For example, create a submit script `benchmark.8.submit` something like this:
@@ -58,16 +61,19 @@ Remember the job ID printed by `condor_submit`, such as `12345.0`. To see whethe
 condor_q NETID
 ```
 
-5 - Evaluate the performance of the benchmark
+6 - Evaluate the performance of the benchmark
 on 64 cores as SIZE starts small and increases by powers of two.
 Stop if your runtime exceeds 30 minutes on 64 cores.
 As above, run these jobs on the cluster, not the front end node.
-Increase `request_memory` and `request_disk` as needed for larger SIZE values.
+Increase `request_memory` and `request_disk` if needed for larger SIZE values.
+(**Note**: There will be queueing delays while waiting for 64-core machines.
+Don't wait until the last day to submit these jobs.)
 
-6 - Plot your results from step 4 (vary cores) and step 5 (vary size)
+7 - Plot your results from step 5 (vary cores) and step 6 (vary size)
 and discuss the results, being sure to point out and explain any unexpected behaviors.
+Take some time to think through the most clear and insightful way to present the results.
 
-7 - Repeat steps 2 through 6 on a second benchmark of your choice.  (Again, not fractal.)
+(Don't forget to repeat for three benchmarks!)
 
 ## Turning In
 
@@ -77,3 +83,4 @@ In all things, show insight, curiosity, and craftsmanship.
 Be sure to push everything to GitHub!
 Turn in your work by submitting the URL of your repository to the corresponding
 assignment page in Canvas.
+
