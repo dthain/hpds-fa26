@@ -71,7 +71,7 @@ void matrix_multiply( matrix_t a, matrix_t b, matrix_t c )
 		for(int j=0; j<SIZE; j++) {
 			double total = 0;
 			for(int k=0; k<SIZE; k++) {
-				total += a[k][j]*b[i][k];
+				total += a[i][k]*b[k][j];
 			}
 			c[i][j] = total;
 		}
