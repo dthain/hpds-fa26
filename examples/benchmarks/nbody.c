@@ -117,6 +117,9 @@ void nbody_interact( struct body *a, struct body *b )
 		b->vy = -b->vy;
 	}
 
+	/* Coincident bodies have no defined force direction. */
+	if(r==0.0) return;
+
 	/* Newton's law of gravitation */
 	double force = (G * a->mass * b->mass) / (r*r) ;
 	
@@ -199,7 +202,6 @@ int main( int argc, char *argv[] )
 
 		/* Print body locations every 1000 timesteps */
 		if(k%1000==0) nbody_print_all(B);
-		nbody_print_all(B);
 	}
 
 	/* Mark the stop of the experiment. */
