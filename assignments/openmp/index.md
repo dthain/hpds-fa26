@@ -60,14 +60,9 @@ condor_q NETID
 
 5 - Evaluate the performance of the benchmark
 on 64 cores as SIZE starts small and increases by powers of two.
-If a run has not finished after 30 minutes of execution, cancel it with
-`condor_rm JOBID`, record it as timed out, and stop increasing SIZE.
-Do not count queue waiting time or plot a timed-out run as a completed timing.
+Stop if your runtime exceeds 30 minutes on 64 cores.
 As above, run these jobs on the cluster, not the front end node.
-Adjust `request_memory` and `request_disk` for each SIZE, including output files and some headroom.
-For example, at SIZE=8192, matrix's three double arrays need 1.5 GiB;
-heat's two double arrays need 1 GiB and its output image needs about 192 MiB.
-These exceed the example requests above.
+Increase `request_memory` and `request_disk` as needed for larger SIZE values.
 
 6 - Plot your results from step 4 (vary cores) and step 5 (vary size)
 and discuss the results, being sure to point out and explain any unexpected behaviors.
