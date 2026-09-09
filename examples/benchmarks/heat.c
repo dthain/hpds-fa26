@@ -143,7 +143,7 @@ void grid_save_pnm( matrix_t M, const char *filename )
 
 double grid_addup( matrix_t m )
 {
-	double total;
+	double total = 0;
 	for(int i=0; i<SIZE; i++) {
 		for(int j=0; j<SIZE; j++) {
 			total += m[i][j];
