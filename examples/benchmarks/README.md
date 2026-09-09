@@ -45,7 +45,6 @@ of the grid, and ITER indicates how many timesteps to compute.
 - [nbody.c](nbody.c) performs a simulation of N bodies moving
 through 2D space, attracted by Netwon's law of gravitation.
 SIZE gives the total number of bodies, and DELTAT indiates the timestep granularity.
-(ITER is not used.)
 
 - [nqueens.c](nqueens.c) searches for solutions to the problem
 of placing N queens on an NxN chessboard.  SIZE is the dimension
