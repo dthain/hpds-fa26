@@ -177,6 +177,8 @@ int main()
 		grid_copy(A,B);
 	}
 
+	grid_boundary_conditions(A);
+
 	/* Mark the stop of the experiment. */
 	struct timeval stop;  
 	gettimeofday(&stop,0);
