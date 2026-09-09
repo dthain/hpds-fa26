@@ -16,6 +16,11 @@ Be creative and make use of appropriate directives and capabilities that we did 
 Take care to understand which data should be private/shared within threads.
 Test your solution using **1 to 4 threads** (but no more) on the CRC Front End machine.
 Double check that the parallelized version produces correct output.
+Compile with `-fopenmp` to enable OpenMP, for example (replace `benchmark.c` with your source file):
+
+```console
+g++ -O1 -fopenmp benchmark.c -o benchmark -lm
+```
 
 4 - Evaluate the performance of the benchmark on 1-64 cores, but 
 **don't run on the front end**.  Instead, submit each execution
@@ -57,6 +62,7 @@ condor_q NETID
 on 64 cores as SIZE starts small and increases by powers of two.
 Stop if your runtime exceeds 30 minutes on 64 cores.
 As above, run these jobs on the cluster, not the front end node.
+Increase `request_memory` and `request_disk` as needed for larger SIZE values.
 
 6 - Plot your results from step 4 (vary cores) and step 5 (vary size)
 and discuss the results, being sure to point out and explain any unexpected behaviors.
