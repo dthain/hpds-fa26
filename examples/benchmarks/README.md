@@ -15,7 +15,7 @@ rearranging data structures, and so forth.  Go nuts!
 
 To get started:
 ```
-git clone git@github.com:dthain/hpds-fa26
+git clone https://github.com/dthain/hpds-fa26
 cd hpds-fa26/examples/benchmarks
 make
 ```
