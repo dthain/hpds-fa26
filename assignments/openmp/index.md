@@ -58,7 +58,7 @@ on 64 cores as SIZE starts small and increases by powers of two.
 Stop if your runtime exceeds 30 minutes on 64 cores.
 As above, run these jobs on the cluster, not the front end node.
 
-6 - Plot your results from step 4 (strong scaling) and step 5 (weak scaling)
+6 - Plot your results from step 4 (vary cores) and step 5 (vary size)
 and discuss the results, being sure to point out and explain any unexpected behaviors.
 
 7 - Repeat steps 2 through 6 on a second benchmark of your choice.  (Again, not fractal.)
@@ -71,7 +71,3 @@ In all things, show insight, curiosity, and craftsmanship.
 Be sure to push everything to GitHub!
 Turn in your work by submitting the URL of your repository to the corresponding
 assignment page in Canvas.
-
-
-
-
