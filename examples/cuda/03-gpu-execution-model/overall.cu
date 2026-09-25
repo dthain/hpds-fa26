@@ -31,10 +31,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <iomanip>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
 
 __global__ void architecture_kernel(const float* input, float* output, int n) {
@@ -56,10 +54,10 @@ __global__ void architecture_kernel(const float* input, float* output, int n) {
 
 
 int main() {
-    const int n = 1'000'003;
+    const int n = 1000003;
     const int repetitions = 20;
     const int candidates[] = {32, 64, 128, 256, 512, 1024};
-    const std::size_t bytes = static_cast<std::size_t>(n) * sizeof(float);
+    const int bytes = n * sizeof(float);
 
     int device = 0;
     CUDA_CHECK(cudaGetDevice(&device));
@@ -68,36 +66,38 @@ int main() {
     cudaFuncAttributes attributes{};
     CUDA_CHECK(cudaFuncGetAttributes(&attributes, architecture_kernel));
 
-    std::cout << "Device: " << p.name << '\n' << "SMs: " << p.multiProcessorCount << ", warp size: " << p.warpSize << ", max threads/SM: " << p.maxThreadsPerMultiProcessor << '\n'
-              << "Kernel registers/thread: " << attributes.numRegs << "\n\n";
+    printf("Device: %s\n", p.name);
+    printf("SMs: %d, warp size: %d, max threads/SM: %d\n", p.multiProcessorCount, p.warpSize, p.maxThreadsPerMultiProcessor);
+    printf("Kernel registers/thread: %d\n\n", attributes.numRegs);
 
-    std::vector<float> input_h(n);
-    std::vector<float> output_h(n);
+    static float input_h[n];
+    static float output_h[n];
     for (int i = 0; i < n; ++i) {
-        input_h[i] = static_cast<float>(i % 1009) * 0.001f;
+        input_h[i] = (float)(i % 1009) * 0.001f;
     }
 
-    float* input_d = nullptr;
-    float* output_d = nullptr;
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&input_d), bytes));
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&output_d), bytes));
-    CUDA_CHECK(cudaMemcpy(input_d, input_h.data(), bytes, cudaMemcpyHostToDevice));
+    float* input_d = NULL;
+    float* output_d = NULL;
+    CUDA_CHECK(cudaMalloc((void**)&input_d, bytes));
+    CUDA_CHECK(cudaMalloc((void**)&output_d, bytes));
+    CUDA_CHECK(cudaMemcpy(input_d, input_h, bytes, cudaMemcpyHostToDevice));
 
-    std::cout << std::left << std::setw(8) << "Block" << std::setw(8) << "Warps" << std::setw(12) << "Blocks/SM" << std::setw(12) << "Occupancy" << "Kernel ms\n";
+    printf("%-8s%-8s%-12s%-12sKernel ms\n", "Block", "Warps", "Blocks/SM", "Occupancy");
 
     bool all_correct = true;
-    for (const int block_size : candidates) {
+    for (int index = 0; index < (int)(sizeof(candidates) / sizeof(candidates[0])); ++index) {
+        const int block_size = candidates[index];
         if (block_size > p.maxThreadsPerBlock) {
             continue;
         }
         const int grid_size = (n + block_size - 1) / block_size;
-        const std::size_t shared_bytes = block_size * sizeof(float);
+        const int shared_bytes = block_size * sizeof(float);
 
         int blocks_per_sm = 0;
         CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks_per_sm, architecture_kernel, block_size, shared_bytes));
         const int warps_per_block = (block_size + p.warpSize - 1) / p.warpSize;
         const int max_warps = p.maxThreadsPerMultiProcessor / p.warpSize;
-        const double occupancy = static_cast<double>(blocks_per_sm * warps_per_block) / max_warps;
+        const double occupancy = (double)(blocks_per_sm * warps_per_block) / max_warps;
 
         architecture_kernel<<<grid_size, block_size, shared_bytes>>>(input_d, output_d, n);
         CUDA_CHECK(cudaDeviceSynchronize()); // warm-up
@@ -109,7 +109,7 @@ int main() {
             CUDA_CHECK(cudaGetLastError());
         });
         const float kernel_ms = total_ms / repetitions;
-        CUDA_CHECK(cudaMemcpy(output_h.data(), output_d, bytes, cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(output_h, output_d, bytes, cudaMemcpyDeviceToHost));
 
         bool correct = true;
         for (int i = 0; i < n; ++i) {
@@ -120,12 +120,11 @@ int main() {
         }
         all_correct = all_correct && correct;
 
-        std::cout << std::left << std::fixed << std::setprecision(3) << std::setw(8) << block_size << std::setw(8) << warps_per_block << std::setw(12) << blocks_per_sm
-                  << std::setw(12) << 100.0 * occupancy << kernel_ms << '\n';
+        printf("%-8d%-8d%-12d%-12.3f%.3f\n", block_size, warps_per_block, blocks_per_sm, 100.0 * occupancy, kernel_ms);
     }
 
     CUDA_CHECK(cudaFree(input_d));
     CUDA_CHECK(cudaFree(output_d));
-    std::cout << "\nOccupancy estimates resident warp capacity; measured time decides performance.\n";
+    printf("\nOccupancy estimates resident warp capacity; measured time decides performance.\n");
     return all_correct ? EXIT_SUCCESS : EXIT_FAILURE;
 }

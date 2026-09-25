@@ -24,9 +24,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
 /*
  * __constant__ variables are declared at file scope. Host code initializes them
@@ -74,13 +73,13 @@ __global__ void memory_spaces_kernel(const float* input, float* output, int n, i
 }
 
 int main() {
-    constexpr int n = 100;
-    const std::size_t bytes = n * sizeof(float);
-    std::vector<float> input_h(n);
-    std::vector<float> output_h(n);
-    std::vector<float> expected_h(n);
+    const int n = 100;
+    const int bytes = n * sizeof(float);
+    static float input_h[n];
+    static float output_h[n];
+    static float expected_h[n];
     for (int i = 0; i < n; ++i) {
-        input_h[i] = static_cast<float>(i);
+        input_h[i] = (float)(i);
     }
 
     const float scale_h = 2.5f;
@@ -88,16 +87,16 @@ int main() {
         expected_h[i] = input_h[i] * scale_h + 1.0f;
     }
 
-    float* input_d = nullptr;
-    float* output_d = nullptr;
+    float* input_d = NULL;
+    float* output_d = NULL;
     check_cuda(cudaMemcpyToSymbol(constant_scale, &scale_h, sizeof(scale_h)), "copy constant scale");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&input_d), bytes), "cudaMalloc input");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&output_d), bytes), "cudaMalloc output");
-    check_cuda(cudaMemcpy(input_d, input_h.data(), bytes, cudaMemcpyHostToDevice), "copy input H2D");
+    check_cuda(cudaMalloc((void**)&input_d, bytes), "cudaMalloc input");
+    check_cuda(cudaMalloc((void**)&output_d, bytes), "cudaMalloc output");
+    check_cuda(cudaMemcpy(input_d, input_h, bytes, cudaMemcpyHostToDevice), "copy input H2D");
     memory_spaces_kernel<<<(n + 31) / 32, 32>>>(input_d, output_d, n, 2026);
     check_cuda(cudaGetLastError(), "launch memory_spaces_kernel");
     check_cuda(cudaDeviceSynchronize(), "execute memory_spaces_kernel");
-    check_cuda(cudaMemcpy(output_h.data(), output_d, bytes, cudaMemcpyDeviceToHost), "copy output D2H");
+    check_cuda(cudaMemcpy(output_h, output_d, bytes, cudaMemcpyDeviceToHost), "copy output D2H");
 
     int marker_h = 0;
     check_cuda(cudaMemcpyFromSymbol(&marker_h, device_launch_marker, sizeof(marker_h)), "copy device marker D2H");
@@ -108,12 +107,12 @@ int main() {
     for (int i = 0; i < n; ++i) {
         max_abs_error = std::max(max_abs_error, std::fabs(output_h[i] - expected_h[i]));
     }
-    std::cout << "Register: one private bias per thread\n"
-              << "Shared memory: one 32-float tile per block\n"
-              << "Constant memory scale: " << scale_h << '\n'
-              << "Persistent global device marker: " << marker_h << '\n'
-              << "Elements checked: " << n << '\n'
-              << "Maximum absolute error: " << max_abs_error << '\n';
+    printf("Register: one private bias per thread\n");
+    printf("Shared memory: one 32-float tile per block\n");
+    printf("Constant memory scale: %.6g\n", scale_h);
+    printf("Persistent global device marker: %d\n", marker_h);
+    printf("Elements checked: %d\n", n);
+    printf("Maximum absolute error: %.6g\n", max_abs_error);
     return marker_h == 2026 && max_abs_error == 0.0f ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

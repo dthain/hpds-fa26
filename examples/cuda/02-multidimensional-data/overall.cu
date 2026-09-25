@@ -38,20 +38,18 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
-#include <cstdlib>
-#include <iostream>
-#include <stdexcept>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
 
 int parse_radius(const char* text) {
-    char* end = nullptr;
-    const long value = std::strtol(text, &end, 10);
+    char* end = NULL;
+    const long value = strtol(text, &end, 10);
     if (*text == '\0' || *end != '\0' || value < 0 || value > 32) {
-        throw std::invalid_argument("Blur radius must be an integer from 0 through 32");
+        fprintf(stderr, "Blur radius must be an integer from 0 through 32\n");
+        exit(EXIT_FAILURE);
     }
-    return static_cast<int>(value);
+    return (int)(value);
 }
 
 __global__ void grayscale_kernel(const unsigned char* rgb, unsigned char* gray, int width, int height) {
@@ -63,7 +61,7 @@ __global__ void grayscale_kernel(const unsigned char* rgb, unsigned char* gray, 
         const unsigned int r = rgb[rgb_offset];
         const unsigned int g = rgb[rgb_offset + 1];
         const unsigned int b = rgb[rgb_offset + 2];
-        gray[pixel] = static_cast<unsigned char>((21u * r + 72u * g + 7u * b) / 100u);
+        gray[pixel] = (unsigned char)((21u * r + 72u * g + 7u * b) / 100u);
     }
 }
 
@@ -83,7 +81,7 @@ __global__ void blur_kernel(const unsigned char* input, unsigned char* output, i
                 }
             }
         }
-        output[row * width + col] = static_cast<unsigned char>(sum / count);
+        output[row * width + col] = (unsigned char)(sum / count);
     }
 }
 
@@ -99,13 +97,13 @@ __global__ void matmul_kernel(const float* a, const float* b, float* c, int m, i
     }
 }
 
-void grayscale_and_blur_cpu(const std::vector<unsigned char>& rgb, std::vector<unsigned char>& gray, std::vector<unsigned char>& blurred, int width, int height, int radius) {
-    for (std::size_t pixel = 0; pixel < gray.size(); ++pixel) {
-        const std::size_t rgb_offset = 3 * pixel;
+void grayscale_and_blur_cpu(const unsigned char* rgb, unsigned char* gray, unsigned char* blurred, int width, int height, int radius) {
+    for (int pixel = 0; pixel < width * height; ++pixel) {
+        const int rgb_offset = 3 * pixel;
         const unsigned int r = rgb[rgb_offset];
         const unsigned int g = rgb[rgb_offset + 1];
         const unsigned int b = rgb[rgb_offset + 2];
-        gray[pixel] = static_cast<unsigned char>((21u * r + 72u * g + 7u * b) / 100u);
+        gray[pixel] = (unsigned char)((21u * r + 72u * g + 7u * b) / 100u);
     }
     for (int row = 0; row < height; ++row) {
         for (int col = 0; col < width; ++col) {
@@ -121,12 +119,12 @@ void grayscale_and_blur_cpu(const std::vector<unsigned char>& rgb, std::vector<u
                     }
                 }
             }
-            blurred[row * width + col] = static_cast<unsigned char>(sum / count);
+            blurred[row * width + col] = (unsigned char)(sum / count);
         }
     }
 }
 
-void matmul_cpu(const std::vector<float>& a, const std::vector<float>& b, std::vector<float>& c, int m, int k_size, int n) {
+void matmul_cpu(const float* a, const float* b, float* c, int m, int k_size, int n) {
     for (int row = 0; row < m; ++row) {
         for (int col = 0; col < n; ++col) {
             float sum = 0.0f;
@@ -138,113 +136,133 @@ void matmul_cpu(const std::vector<float>& a, const std::vector<float>& b, std::v
     }
 }
 
-int maximum_byte_difference(const std::vector<unsigned char>& actual, const std::vector<unsigned char>& expected) {
+int maximum_byte_difference(const unsigned char* actual, const unsigned char* expected, int pixels) {
     int maximum = 0;
-    for (std::size_t i = 0; i < actual.size(); ++i) {
-        maximum = std::max(maximum, std::abs(static_cast<int>(actual[i]) - static_cast<int>(expected[i])));
+    for (int i = 0; i < pixels; ++i) {
+        maximum = std::max(maximum, std::abs((int)(actual[i]) - (int)(expected[i])));
     }
     return maximum;
 }
 
 int main(int argc, char** argv) {
     if (argc != 4 && argc != 5) {
-        std::cerr << "Usage: " << argv[0] << " INPUT.png GRAYSCALE.png BLURRED.png [RADIUS]\n";
+        fprintf(stderr, "Usage: %s INPUT.png GRAYSCALE.png BLURRED.png [RADIUS]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    try {
-        const int radius = argc == 5 ? parse_radius(argv[4]) : 2;
-        int width = 0;
-        int height = 0;
-        const std::vector<unsigned char> rgb_h = png_io::read_rgb_png(argv[1], width, height);
-        const std::size_t pixels = static_cast<std::size_t>(width) * height;
-        const std::size_t rgb_bytes = 3 * pixels;
-        const std::size_t gray_bytes = pixels;
-        std::vector<unsigned char> gray_reference(pixels);
-        std::vector<unsigned char> blur_reference(pixels);
-        std::vector<unsigned char> gray_gpu(pixels);
-        std::vector<unsigned char> blur_gpu(pixels);
-
-        grayscale_and_blur_cpu(rgb_h, gray_reference, blur_reference, width, height, radius);
-
-        unsigned char* rgb_d = nullptr;
-        unsigned char* gray_d = nullptr;
-        unsigned char* blur_d = nullptr;
-        check_cuda(cudaMalloc(reinterpret_cast<void**>(&rgb_d), rgb_bytes), "cudaMalloc RGB");
-        check_cuda(cudaMalloc(reinterpret_cast<void**>(&gray_d), gray_bytes), "cudaMalloc grayscale");
-        check_cuda(cudaMalloc(reinterpret_cast<void**>(&blur_d), gray_bytes), "cudaMalloc blur");
-        check_cuda(cudaMemcpy(rgb_d, rgb_h.data(), rgb_bytes, cudaMemcpyHostToDevice), "copy RGB H2D");
-
-        const dim3 image_block(16, 16);
-        const dim3 image_grid((width + image_block.x - 1) / image_block.x, (height + image_block.y - 1) / image_block.y);
-        grayscale_kernel<<<image_grid, image_block>>>(rgb_d, gray_d, width, height);
-        check_cuda(cudaGetLastError(), "launch grayscale_kernel");
-        blur_kernel<<<image_grid, image_block>>>(gray_d, blur_d, width, height, radius);
-        check_cuda(cudaGetLastError(), "launch blur_kernel");
-        check_cuda(cudaDeviceSynchronize(), "execute image pipeline");
-        check_cuda(cudaMemcpy(gray_gpu.data(), gray_d, gray_bytes, cudaMemcpyDeviceToHost), "copy grayscale D2H");
-        check_cuda(cudaMemcpy(blur_gpu.data(), blur_d, gray_bytes, cudaMemcpyDeviceToHost), "copy blur D2H");
-        check_cuda(cudaFree(rgb_d), "cudaFree RGB");
-        check_cuda(cudaFree(gray_d), "cudaFree grayscale");
-        check_cuda(cudaFree(blur_d), "cudaFree blur");
-
-        const int gray_difference = maximum_byte_difference(gray_gpu, gray_reference);
-        const int blur_difference = maximum_byte_difference(blur_gpu, blur_reference);
-        png_io::write_grayscale_png(argv[2], gray_gpu, width, height);
-        png_io::write_grayscale_png(argv[3], blur_gpu, width, height);
-
-        std::cout << "Image pipeline: " << argv[1] << " (" << width << 'x' << height << "), blur radius: " << radius << '\n'
-                  << "Grayscale output: " << argv[2] << '\n' << "Blurred output: " << argv[3] << '\n'
-                  << "Device-resident handoff: grayscale output feeds blur without an intermediate host copy.\n"
-                  << "Pixels checked against CPU references: " << pixels << '\n'
-                  << "Maximum grayscale difference: " << gray_difference << '\n' << "Maximum blur difference: " << blur_difference << '\n';
-
-        // Use a substantial rectangular problem whose dimensions also exercise the 16x16 grid's boundary guards.
-        const int m = 513;
-        const int k_size = 511;
-        const int n = 515;
-        std::vector<float> a_h(m * k_size);
-        std::vector<float> b_h(k_size * n);
-        std::vector<float> c_reference(m * n);
-        std::vector<float> c_gpu(m * n);
-        for (std::size_t i = 0; i < a_h.size(); ++i) {
-            a_h[i] = static_cast<float>(i % 11) * 0.25f;
-        }
-        for (std::size_t i = 0; i < b_h.size(); ++i) {
-            b_h[i] = static_cast<float>(i % 13) * 0.125f - 0.5f;
-        }
-
-        matmul_cpu(a_h, b_h, c_reference, m, k_size, n);
-
-        float* a_d = nullptr;
-        float* b_d = nullptr;
-        float* c_d = nullptr;
-        check_cuda(cudaMalloc(reinterpret_cast<void**>(&a_d), a_h.size() * sizeof(float)), "cudaMalloc A");
-        check_cuda(cudaMalloc(reinterpret_cast<void**>(&b_d), b_h.size() * sizeof(float)), "cudaMalloc B");
-        check_cuda(cudaMalloc(reinterpret_cast<void**>(&c_d), c_gpu.size() * sizeof(float)), "cudaMalloc C");
-        check_cuda(cudaMemcpy(a_d, a_h.data(), a_h.size() * sizeof(float), cudaMemcpyHostToDevice), "copy A H2D");
-        check_cuda(cudaMemcpy(b_d, b_h.data(), b_h.size() * sizeof(float), cudaMemcpyHostToDevice), "copy B H2D");
-
-        const dim3 matrix_block(16, 16);
-        const dim3 matrix_grid((n + matrix_block.x - 1) / matrix_block.x, (m + matrix_block.y - 1) / matrix_block.y);
-        matmul_kernel<<<matrix_grid, matrix_block>>>(a_d, b_d, c_d, m, k_size, n);
-        check_cuda(cudaGetLastError(), "launch matmul_kernel");
-        check_cuda(cudaDeviceSynchronize(), "execute matmul_kernel");
-        check_cuda(cudaMemcpy(c_gpu.data(), c_d, c_gpu.size() * sizeof(float), cudaMemcpyDeviceToHost), "copy C D2H");
-        check_cuda(cudaFree(a_d), "cudaFree A");
-        check_cuda(cudaFree(b_d), "cudaFree B");
-        check_cuda(cudaFree(c_d), "cudaFree C");
-
-        float matrix_max_error = 0.0f;
-        for (std::size_t i = 0; i < c_gpu.size(); ++i) {
-            matrix_max_error = std::max(matrix_max_error, std::fabs(c_gpu[i] - c_reference[i]));
-        }
-        std::cout << "Matrix: " << m << 'x' << k_size << " times " << k_size << 'x' << n << '\n'
-                  << "Outputs checked against CPU reference: " << c_gpu.size() << '\n' << "Maximum absolute error: " << matrix_max_error << '\n';
-
-        return gray_difference == 0 && blur_difference == 0 && matrix_max_error <= 1.0e-4f ? EXIT_SUCCESS : EXIT_FAILURE;
-    } catch (const std::exception& error) {
-        std::cerr << "Error: " << error.what() << '\n';
-        return EXIT_FAILURE;
+    const int radius = argc == 5 ? parse_radius(argv[4]) : 2;
+    int width = 0;
+    int height = 0;
+    unsigned char* rgb_h = read_rgb_png(argv[1], &width, &height);
+    const int pixels = width * height;
+    const int rgb_bytes = 3 * pixels;
+    const int gray_bytes = pixels;
+    unsigned char* gray_reference = (unsigned char*)malloc(pixels);
+    if (!gray_reference) {
+        fprintf(stderr, "Cannot allocate image array\n");
+        exit(EXIT_FAILURE);
     }
+    unsigned char* blur_reference = (unsigned char*)malloc(pixels);
+    if (!blur_reference) {
+        fprintf(stderr, "Cannot allocate image array\n");
+        exit(EXIT_FAILURE);
+    }
+    unsigned char* gray_gpu = (unsigned char*)malloc(pixels);
+    if (!gray_gpu) {
+        fprintf(stderr, "Cannot allocate image array\n");
+        exit(EXIT_FAILURE);
+    }
+    unsigned char* blur_gpu = (unsigned char*)malloc(pixels);
+    if (!blur_gpu) {
+        fprintf(stderr, "Cannot allocate image array\n");
+        exit(EXIT_FAILURE);
+    }
+
+    grayscale_and_blur_cpu(rgb_h, gray_reference, blur_reference, width, height, radius);
+
+    unsigned char* rgb_d = NULL;
+    unsigned char* gray_d = NULL;
+    unsigned char* blur_d = NULL;
+    check_cuda(cudaMalloc((void**)&rgb_d, rgb_bytes), "cudaMalloc RGB");
+    check_cuda(cudaMalloc((void**)&gray_d, gray_bytes), "cudaMalloc grayscale");
+    check_cuda(cudaMalloc((void**)&blur_d, gray_bytes), "cudaMalloc blur");
+    check_cuda(cudaMemcpy(rgb_d, rgb_h, rgb_bytes, cudaMemcpyHostToDevice), "copy RGB H2D");
+
+    const dim3 image_block(16, 16);
+    const dim3 image_grid((width + image_block.x - 1) / image_block.x, (height + image_block.y - 1) / image_block.y);
+    grayscale_kernel<<<image_grid, image_block>>>(rgb_d, gray_d, width, height);
+    check_cuda(cudaGetLastError(), "launch grayscale_kernel");
+    blur_kernel<<<image_grid, image_block>>>(gray_d, blur_d, width, height, radius);
+    check_cuda(cudaGetLastError(), "launch blur_kernel");
+    check_cuda(cudaDeviceSynchronize(), "execute image pipeline");
+    check_cuda(cudaMemcpy(gray_gpu, gray_d, gray_bytes, cudaMemcpyDeviceToHost), "copy grayscale D2H");
+    check_cuda(cudaMemcpy(blur_gpu, blur_d, gray_bytes, cudaMemcpyDeviceToHost), "copy blur D2H");
+    check_cuda(cudaFree(rgb_d), "cudaFree RGB");
+    check_cuda(cudaFree(gray_d), "cudaFree grayscale");
+    check_cuda(cudaFree(blur_d), "cudaFree blur");
+
+    const int gray_difference = maximum_byte_difference(gray_gpu, gray_reference, pixels);
+    const int blur_difference = maximum_byte_difference(blur_gpu, blur_reference, pixels);
+    write_grayscale_png(argv[2], gray_gpu, width, height);
+    write_grayscale_png(argv[3], blur_gpu, width, height);
+
+    printf("Image pipeline: %s (%dx%d), blur radius: %d\n", argv[1], width, height, radius);
+    printf("Grayscale output: %s\n", argv[2]);
+    printf("Blurred output: %s\n", argv[3]);
+    printf("Device-resident handoff: grayscale output feeds blur without an intermediate host copy.\n");
+    printf("Pixels checked against CPU references: %d\n", pixels);
+    printf("Maximum grayscale difference: %d\n", gray_difference);
+    printf("Maximum blur difference: %d\n", blur_difference);
+
+    // Use a substantial rectangular problem whose dimensions also exercise the 16x16 grid's boundary guards.
+    const int m = 513;
+    const int k_size = 511;
+    const int n = 515;
+    static float a_h[m * k_size];
+    static float b_h[k_size * n];
+    static float c_reference[m * n];
+    static float c_gpu[m * n];
+    for (int i = 0; i < (m * k_size); ++i) {
+        a_h[i] = (float)(i % 11) * 0.25f;
+    }
+    for (int i = 0; i < (k_size * n); ++i) {
+        b_h[i] = (float)(i % 13) * 0.125f - 0.5f;
+    }
+
+    matmul_cpu(a_h, b_h, c_reference, m, k_size, n);
+
+    float* a_d = NULL;
+    float* b_d = NULL;
+    float* c_d = NULL;
+    check_cuda(cudaMalloc((void**)&a_d, (m * k_size) * sizeof(float)), "cudaMalloc A");
+    check_cuda(cudaMalloc((void**)&b_d, (k_size * n) * sizeof(float)), "cudaMalloc B");
+    check_cuda(cudaMalloc((void**)&c_d, (m * n) * sizeof(float)), "cudaMalloc C");
+    check_cuda(cudaMemcpy(a_d, a_h, (m * k_size) * sizeof(float), cudaMemcpyHostToDevice), "copy A H2D");
+    check_cuda(cudaMemcpy(b_d, b_h, (k_size * n) * sizeof(float), cudaMemcpyHostToDevice), "copy B H2D");
+
+    const dim3 matrix_block(16, 16);
+    const dim3 matrix_grid((n + matrix_block.x - 1) / matrix_block.x, (m + matrix_block.y - 1) / matrix_block.y);
+    matmul_kernel<<<matrix_grid, matrix_block>>>(a_d, b_d, c_d, m, k_size, n);
+    check_cuda(cudaGetLastError(), "launch matmul_kernel");
+    check_cuda(cudaDeviceSynchronize(), "execute matmul_kernel");
+    check_cuda(cudaMemcpy(c_gpu, c_d, (m * n) * sizeof(float), cudaMemcpyDeviceToHost), "copy C D2H");
+    check_cuda(cudaFree(a_d), "cudaFree A");
+    check_cuda(cudaFree(b_d), "cudaFree B");
+    check_cuda(cudaFree(c_d), "cudaFree C");
+
+    float matrix_max_error = 0.0f;
+    for (int i = 0; i < (m * n); ++i) {
+        matrix_max_error = std::max(matrix_max_error, std::fabs(c_gpu[i] - c_reference[i]));
+    }
+    printf("Matrix: %dx%d times %dx%d\n", m, k_size, k_size, n);
+    printf("Outputs checked against CPU reference: %d\n", (m * n));
+    printf("Maximum absolute error: %.6g\n", matrix_max_error);
+
+    free(rgb_h);
+    free(gray_reference);
+    free(blur_reference);
+    free(gray_gpu);
+    free(blur_gpu);
+
+    return gray_difference == 0 && blur_difference == 0 && matrix_max_error <= 1.0e-4f ? EXIT_SUCCESS : EXIT_FAILURE;
 }

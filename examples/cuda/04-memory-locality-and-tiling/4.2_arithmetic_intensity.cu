@@ -30,9 +30,8 @@
 
 #include <cuda_runtime.h>
 
-#include <cstdlib>
-#include <iomanip>
-#include <iostream>
+#include <stdlib.h>
+#include <stdio.h>
 
 int main() {
     int device = 0;
@@ -40,7 +39,7 @@ int main() {
     cudaDeviceProp p{};
     const cudaError_t error = cudaGetDeviceProperties(&p, device);
     if (error != cudaSuccess) {
-        std::cerr << cudaGetErrorString(error) << '\n';
+        fprintf(stderr, "%s\n", cudaGetErrorString(error));
         return EXIT_FAILURE;
     }
 
@@ -54,17 +53,17 @@ int main() {
      */
     const double peak_bandwidth_gbs = 2.0 * p.memoryClockRate * 1000.0 * (p.memoryBusWidth / 8.0) / 1.0e9;
 
-    std::cout << "Device: " << p.name << '\n' << "Estimated peak memory bandwidth: " << std::fixed << std::setprecision(1) << peak_bandwidth_gbs << " GB/s\n\n"
-              << std::left << std::setw(12) << "Tile width" << std::setw(18) << "Approx FLOP/B" << "Bandwidth roof (GFLOP/s)\n";
+    printf("Device: %s\n", p.name);
+    printf("Estimated peak memory bandwidth: %.1f GB/s\n\n", peak_bandwidth_gbs);
+    printf("%-12s%-18sBandwidth roof (GFLOP/s)\n", "Tile width", "Approx FLOP/B");
 
     const int tile_widths[] = {1, 8, 16, 32};
-    for (const int tile : tile_widths) {
+    for (int index = 0; index < (int)(sizeof(tile_widths) / sizeof(tile_widths[0])); ++index) {
+        const int tile = tile_widths[index];
         const double intensity = 0.25 * tile;
         const double bandwidth_roof_gflops = peak_bandwidth_gbs * intensity;
-        std::cout << std::left << std::setw(12) << tile << std::setw(18) << std::setprecision(2) << intensity << std::setprecision(1) << bandwidth_roof_gflops << '\n';
+        printf("%-12d%-18.2f%.1f\n", tile, intensity, bandwidth_roof_gflops);
     }
 
-    std::cout << "\nA roof is an upper bound. Poor coalescing, latency, instruction "
-                 "overhead, or insufficient parallelism can place real results "
-                 "well below it.\n";
+    printf("\nA roof is an upper bound. Poor coalescing, latency, instruction overhead, or insufficient parallelism can place real results well below it.\n");
 }

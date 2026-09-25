@@ -15,61 +15,71 @@
 
 #include <png.h>
 
-#include <limits>
-#include <stdexcept>
-#include <string>
-#include <vector>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-namespace png_io {
-
-inline std::vector<unsigned char> read_png_as(const char* path, int& width, int& height, png_uint_32 format) {
-    png_image image{};
+inline unsigned char* read_png_as(const char* path, int* width, int* height, png_uint_32 format) {
+    png_image image = {};
     image.version = PNG_IMAGE_VERSION;
 
     if (!png_image_begin_read_from_file(&image, path)) {
-        throw std::runtime_error(std::string("Cannot open input PNG: ") + image.message);
-    }
-    if (image.width > static_cast<png_uint_32>(std::numeric_limits<int>::max()) || image.height > static_cast<png_uint_32>(std::numeric_limits<int>::max())) {
+        fprintf(stderr, "Cannot open input PNG: %s\n", image.message);
         png_image_free(&image);
-        throw std::runtime_error("Image dimensions exceed the integer range used by the CUDA kernels");
+        exit(EXIT_FAILURE);
     }
-
     image.format = format;
-    std::vector<unsigned char> pixels(PNG_IMAGE_SIZE(image));
-    if (!png_image_finish_read(&image, nullptr, pixels.data(), 0, nullptr)) {
-        const std::string message = image.message;
+    const int channels = PNG_IMAGE_PIXEL_CHANNELS(format);
+    if (image.width == 0 || image.height == 0 || image.width > INT_MAX / channels ||
+        image.height > INT_MAX / channels / image.width) {
+        fprintf(stderr, "Image dimensions exceed the integer range used by the CUDA kernels\n");
         png_image_free(&image);
-        throw std::runtime_error(std::string("Cannot decode input PNG: ") + message);
+        exit(EXIT_FAILURE);
     }
 
-    width = static_cast<int>(image.width);
-    height = static_cast<int>(image.height);
+    unsigned char* pixels = (unsigned char*)malloc(PNG_IMAGE_SIZE(image));
+    if (!pixels) {
+        fprintf(stderr, "Cannot allocate image array\n");
+        png_image_free(&image);
+        exit(EXIT_FAILURE);
+    }
+    if (!png_image_finish_read(&image, NULL, pixels, 0, NULL)) {
+        fprintf(stderr, "Cannot decode input PNG: %s\n", image.message);
+        free(pixels);
+        png_image_free(&image);
+        exit(EXIT_FAILURE);
+    }
+
+    *width = (int)image.width;
+    *height = (int)image.height;
     png_image_free(&image);
     return pixels;
 }
 
-inline std::vector<unsigned char> read_rgb_png(const char* path, int& width, int& height) {
+inline unsigned char* read_rgb_png(const char* path, int* width, int* height) {
     return read_png_as(path, width, height, PNG_FORMAT_RGB);
 }
 
-inline std::vector<unsigned char> read_grayscale_png(const char* path, int& width, int& height) {
+inline unsigned char* read_grayscale_png(const char* path, int* width, int* height) {
     return read_png_as(path, width, height, PNG_FORMAT_GRAY);
 }
 
-inline void write_grayscale_png(const char* path, const std::vector<unsigned char>& pixels, int width, int height) {
-    if (width <= 0 || height <= 0 || pixels.size() != static_cast<std::size_t>(width) * height) {
-        throw std::invalid_argument("Grayscale PNG dimensions do not match its pixel array");
+inline void write_grayscale_png(const char* path, const unsigned char* pixels, int width, int height) {
+    if (width <= 0 || height <= 0 || width > INT_MAX / height) {
+        fprintf(stderr, "Invalid grayscale PNG dimensions\n");
+        exit(EXIT_FAILURE);
     }
 
-    png_image image{};
+    png_image image = {};
     image.version = PNG_IMAGE_VERSION;
-    image.width = static_cast<png_uint_32>(width);
-    image.height = static_cast<png_uint_32>(height);
+    image.width = width;
+    image.height = height;
     image.format = PNG_FORMAT_GRAY;
 
-    if (!png_image_write_to_file(&image, path, 0, pixels.data(), 0, nullptr)) {
-        throw std::runtime_error(std::string("Cannot write output PNG: ") + image.message);
+    if (!png_image_write_to_file(&image, path, 0, pixels, 0, NULL)) {
+        fprintf(stderr, "Cannot write output PNG: %s\n", image.message);
+        png_image_free(&image);
+        exit(EXIT_FAILURE);
     }
+    png_image_free(&image);
 }
-
-}  // namespace png_io

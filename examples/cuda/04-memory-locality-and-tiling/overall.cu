@@ -28,12 +28,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <iomanip>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
-constexpr int kTile = 16;
+const int kTile = 16;
 
 
 __global__ void naive_matmul(const float* a, const float* b, float* c, int m, int k_size, int n) {
@@ -75,9 +73,10 @@ __global__ void tiled_matmul(const float* a, const float* b, float* c, int m, in
 }
 
 
-float maximum_error(const std::vector<float>& actual, float expected) {
+float maximum_error(const float* actual, int elements, float expected) {
     float result = 0.0f;
-    for (const float value : actual) {
+    for (int i = 0; i < elements; ++i) {
+        const float value = actual[i];
         result = std::max(result, std::fabs(value - expected));
     }
     return result;
@@ -85,33 +84,39 @@ float maximum_error(const std::vector<float>& actual, float expected) {
 
 int main() {
     // Odd rectangular dimensions exercise all three boundary conditions.
-    constexpr int m = 1601;
-    constexpr int k_size = 1603;
-    constexpr int n = 1607;
-    constexpr int repetitions = 5;
-    constexpr int measurement_rounds = 5;
+    const int m = 1601;
+    const int k_size = 1603;
+    const int n = 1607;
+    const int repetitions = 5;
+    const int measurement_rounds = 5;
 
-    const std::size_t a_elements = static_cast<std::size_t>(m) * k_size;
-    const std::size_t b_elements = static_cast<std::size_t>(k_size) * n;
-    const std::size_t c_elements = static_cast<std::size_t>(m) * n;
-    std::vector<float> a_h(a_elements, 0.5f);
-    std::vector<float> b_h(b_elements, 0.25f);
-    std::vector<float> naive_h(c_elements);
-    std::vector<float> tiled_h(c_elements);
+    const int a_elements = m * k_size;
+    const int b_elements = k_size * n;
+    const int c_elements = m * n;
+    static float a_h[a_elements];
+    for (int i = 0; i < a_elements; ++i) {
+        a_h[i] = 0.5f;
+    }
+    static float b_h[b_elements];
+    for (int i = 0; i < b_elements; ++i) {
+        b_h[i] = 0.25f;
+    }
+    static float naive_h[c_elements];
+    static float tiled_h[c_elements];
 
-    float* a_d = nullptr;
-    float* b_d = nullptr;
-    float* naive_d = nullptr;
-    float* tiled_d = nullptr;
-    const std::size_t a_bytes = a_h.size() * sizeof(float);
-    const std::size_t b_bytes = b_h.size() * sizeof(float);
-    const std::size_t c_bytes = c_elements * sizeof(float);
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&a_d), a_bytes));
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&b_d), b_bytes));
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&naive_d), c_bytes));
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&tiled_d), c_bytes));
-    CUDA_CHECK(cudaMemcpy(a_d, a_h.data(), a_bytes, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(b_d, b_h.data(), b_bytes, cudaMemcpyHostToDevice));
+    float* a_d = NULL;
+    float* b_d = NULL;
+    float* naive_d = NULL;
+    float* tiled_d = NULL;
+    const int a_bytes = a_elements * sizeof(float);
+    const int b_bytes = b_elements * sizeof(float);
+    const int c_bytes = c_elements * sizeof(float);
+    CUDA_CHECK(cudaMalloc((void**)&a_d, a_bytes));
+    CUDA_CHECK(cudaMalloc((void**)&b_d, b_bytes));
+    CUDA_CHECK(cudaMalloc((void**)&naive_d, c_bytes));
+    CUDA_CHECK(cudaMalloc((void**)&tiled_d, c_bytes));
+    CUDA_CHECK(cudaMemcpy(a_d, a_h, a_bytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(b_d, b_h, b_bytes, cudaMemcpyHostToDevice));
 
     const dim3 block(kTile, kTile);
     const dim3 grid((n + kTile - 1) / kTile, (m + kTile - 1) / kTile);
@@ -121,41 +126,39 @@ int main() {
     CUDA_CHECK(cudaGetLastError());
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    std::vector<float> naive_samples;
-    std::vector<float> tiled_samples;
-    naive_samples.reserve(measurement_rounds);
-    tiled_samples.reserve(measurement_rounds);
-    const auto measure_naive = [&] {
+    float naive_samples[measurement_rounds];
+    float tiled_samples[measurement_rounds];
+    const auto measure_naive = [&](int round) {
         const float total_ms = time_cuda_ms([&] {
             for (int repetition = 0; repetition < repetitions; ++repetition) {
                 naive_matmul<<<grid, block>>>(a_d, b_d, naive_d, m, k_size, n);
             }
             CUDA_CHECK(cudaGetLastError());
         });
-        naive_samples.push_back(total_ms / repetitions);
+        naive_samples[round] = total_ms / repetitions;
     };
-    const auto measure_tiled = [&] {
+    const auto measure_tiled = [&](int round) {
         const float total_ms = time_cuda_ms([&] {
             for (int repetition = 0; repetition < repetitions; ++repetition) {
                 tiled_matmul<<<grid, block>>>(a_d, b_d, tiled_d, m, k_size, n);
             }
             CUDA_CHECK(cudaGetLastError());
         });
-        tiled_samples.push_back(total_ms / repetitions);
+        tiled_samples[round] = total_ms / repetitions;
     };
 
     for (int round = 0; round < measurement_rounds; ++round) {
         if ((round & 1) == 0) {
-            measure_naive();
-            measure_tiled();
+            measure_naive(round);
+            measure_tiled(round);
         } else {
-            measure_tiled();
-            measure_naive();
+            measure_tiled(round);
+            measure_naive(round);
         }
     }
 
-    CUDA_CHECK(cudaMemcpy(naive_h.data(), naive_d, c_bytes, cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(tiled_h.data(), tiled_d, c_bytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(naive_h, naive_d, c_bytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(tiled_h, tiled_d, c_bytes, cudaMemcpyDeviceToHost));
 
     int naive_blocks_per_sm = 0;
     int tiled_blocks_per_sm = 0;
@@ -168,25 +171,22 @@ int main() {
     CUDA_CHECK(cudaFree(tiled_d));
 
     const float expected = k_size * 0.5f * 0.25f;
-    const float naive_error = maximum_error(naive_h, expected);
-    const float tiled_error = maximum_error(tiled_h, expected);
-    const float naive_ms = median_cuda_ms(naive_samples);
-    const float tiled_ms = median_cuda_ms(tiled_samples);
+    const float naive_error = maximum_error(naive_h, c_elements, expected);
+    const float tiled_error = maximum_error(tiled_h, c_elements, expected);
+    const float naive_ms = median_cuda_ms(naive_samples, measurement_rounds);
+    const float tiled_ms = median_cuda_ms(tiled_samples, measurement_rounds);
     const double operations = 2.0 * m * k_size * n;
     const double naive_gflops = operations / (naive_ms * 1.0e6);
     const double tiled_gflops = operations / (tiled_ms * 1.0e6);
     const bool correct = naive_error <= 1.0e-3f && tiled_error <= 1.0e-3f;
 
-    std::cout << "A: " << m << 'x' << k_size << ", B: " << k_size << 'x' << n << '\n'
-              << "Tile: " << kTile << 'x' << kTile << ", static shared/block: " << 2 * kTile * kTile * sizeof(float) << " bytes\n"
-              << "Approximate global-load reduction from tiling: " << kTile << "x\n"
-              << "Timing: median of " << measurement_rounds << " rounds, " << repetitions << " launches per round; memory copies excluded.\n\n"
-              << std::left << std::setw(12) << "GPU kernel" << std::right << std::setw(14) << "Time (ms)" << std::setw(14) << "GFLOP/s" << std::setw(14)
-              << "Blocks/SM" << std::setw(14) << "Max error" << '\n'
-              << std::left << std::setw(12) << "Naive" << std::right << std::setw(14) << naive_ms << std::setw(14) << naive_gflops << std::setw(14)
-              << naive_blocks_per_sm << std::setw(14) << naive_error << '\n'
-              << std::left << std::setw(12) << "Tiled" << std::right << std::setw(14) << tiled_ms << std::setw(14) << tiled_gflops << std::setw(14)
-              << tiled_blocks_per_sm << std::setw(14) << tiled_error << '\n'
-              << "Tiled speedup over naive GPU (naive / tiled): " << naive_ms / tiled_ms << "x\n";
+    printf("A: %dx%d, B: %dx%d\n", m, k_size, k_size, n);
+    printf("Tile: %dx%d, static shared/block: %zu bytes\n", kTile, kTile, 2 * kTile * kTile * sizeof(float));
+    printf("Approximate global-load reduction from tiling: %dx\n", kTile);
+    printf("Timing: median of %d rounds, %d launches per round; memory copies excluded.\n\n", measurement_rounds, repetitions);
+    printf("%-12s%14s%14s%14s%14s\n", "GPU kernel", "Time (ms)", "GFLOP/s", "Blocks/SM", "Max error");
+    printf("%-12s%14.6g%14.6g%14d%14.6g\n", "Naive", naive_ms, naive_gflops, naive_blocks_per_sm, naive_error);
+    printf("%-12s%14.6g%14.6g%14d%14.6g\n", "Tiled", tiled_ms, tiled_gflops, tiled_blocks_per_sm, tiled_error);
+    printf("Tiled speedup over naive GPU (naive / tiled): %.6gx\n", naive_ms / tiled_ms);
     return correct ? EXIT_SUCCESS : EXIT_FAILURE;
 }
