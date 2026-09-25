@@ -4,149 +4,175 @@
  * HTCondor (Notre Dame CRC): build on the front end, run on a GPU worker
  *   module load cuda/12.1
  *   make 2.2_rgb_to_grayscale
- *   ./2.2_rgb_to_grayscale bird.png bird_grayscale.png
+ *   ./2.2_rgb_to_grayscale
  *
  * Slurm (Purdue Anvil): build on the login node, run with sbatch
  *   module load modtree/gpu cuda/12.8.0
  *   make 2.2_rgb_to_grayscale
- *   sbatch ../common/anvil_gpu.slurm ./2.2_rgb_to_grayscale bird.png bird_grayscale.png
+ *   sbatch ../common/anvil_gpu.slurm
  *
  * Section 2.2: Convert an RGB PNG to grayscale
  *
  * A two-dimensional CUDA thread coordinate selects one pixel and its three RGB
- * bytes.
- *
- * The host uses libpng through png_io.h to decode INPUT.png into this flat,
- * row-major byte layout:
+ * bytes.  The RGB data comes like this:
  *
  *     R0 G0 B0 | R1 G1 B1 | R2 G2 B2 | ...
  *
- * The kernel never sees PNG compression. It receives decoded bytes, writes one
- * grayscale byte per pixel, and leaves PNG encoding to the host.
+ * And is converted into grayscale data like this:
  *
- * Each thread follows these mappings:
- *
- *     col = blockIdx.x * blockDim.x + threadIdx.x
- *     row = blockIdx.y * blockDim.y + threadIdx.y
- *     pixel = row * width + col
- *     RGB byte offset = 3 * pixel
- *
- * Command-line arguments:
- *
- * 1. input PNG path;
- * 2. output grayscale PNG path.
- */
+ *     G0 G1 G2 ...
+*/
+
+/*
+NOTE: As given, this code shows the CPU version faster than the GPU.
+Can you explain why, and make some changes that might improve things?
+*/
 
 #include <cuda_runtime.h>
 
 #include "../common/cuda_helpers.h"
 
-#include "png_io.h"
-
-#include <algorithm>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
 
+#define SIZE 1024
 
-__global__ void rgb_to_grayscale_kernel(const unsigned char* rgb, unsigned char* gray, int width, int height) {
-    const int col = blockIdx.x * blockDim.x + threadIdx.x;
-    const int row = blockIdx.y * blockDim.y + threadIdx.y;
+/*
+Convert a matrix of 8-bit r,g,b values
+into a matrix of 8-bit grayscale values.
+Using the CPU, iterate over the entire array size,
+and convert each one at a time.
+*/
 
-    // Ceiling division may launch threads past the image, so only valid coordinates may access memory.
-    if (row < height && col < width) {
-        const int pixel = row * width + col;
-        const int rgb_offset = 3 * pixel;
-        const unsigned int r = rgb[rgb_offset];
-        const unsigned int g = rgb[rgb_offset + 1];
-        const unsigned int b = rgb[rgb_offset + 2];
+void rgb_to_grayscale_cpu( uint8_t *rgb, uint8_t *gray, int width, int height )
+{
+	for(int j=0; j<height; j++) {
 
-        /*
-         * Human vision is more sensitive to green than red and more sensitive
-         * to red than blue, so grayscale is a weighted sum rather than a plain
-         * average. These integer weights approximate 0.21R + 0.72G + 0.07B.
-         * They sum to 100, keep the result in [0, 255], and make CPU/GPU
-         * comparison exactly reproducible for byte-valued input.
-         */
-        gray[pixel] = (unsigned char)((21u * r + 72u * g + 7u * b) / 100u);
-    }
+		for(int i=0; i<width; i++) {
+
+			int rgb_offset = 3 * (i+j*height);
+
+			int r = rgb[rgb_offset];
+		        int g = rgb[rgb_offset + 1];
+		        int b = rgb[rgb_offset + 2];
+
+			gray[i+j*height] = (21*r + 72*g + 7*b) / 100;
+		}
+	}
 }
 
-void grayscale_cpu(const unsigned char* rgb, unsigned char* gray, int pixels) {
-    for (int pixel = 0; pixel < pixels; ++pixel) {
-        const int rgb_offset = 3 * pixel;
-        const unsigned int r = rgb[rgb_offset];
-        const unsigned int g = rgb[rgb_offset + 1];
-        const unsigned int b = rgb[rgb_offset + 2];
-        gray[pixel] = (unsigned char)((21u * r + 72u * g + 7u * b) / 100u);
-    }
+/*
+Convert a matrix of 8-bit r,g,b values
+into a matrix of 8-bit grayscale values.
+Using the GPU, locate each thread's position
+in the matrix, and convert one value.
+*/
+
+__global__ void rgb_to_grayscale_gpu( uint8_t* rgb, uint8_t* gray, int width, int height )
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if ( i<width && j<height ) {
+
+		int rgb_offset = 3 * (i+j*height);
+
+		int r = rgb[rgb_offset];
+	        int g = rgb[rgb_offset + 1];
+	        int b = rgb[rgb_offset + 2];
+
+		gray[i+j*height] = (21*r + 72*g + 7*b) / 100;
+		//printf("i %d j %d r %d g %d b %d gray %d\n",i,j,r,g,b,gray[i+j*height]);
+	}
 }
 
-int maximum_byte_difference(const unsigned char* actual, const unsigned char* expected, int pixels) {
-    int maximum = 0;
-    for (int i = 0; i < pixels; ++i) {
-        maximum = std::max(maximum, std::abs((int)(actual[i]) - (int)(expected[i])));
-    }
-    return maximum;
-}
+int main(int argc, char** argv)
+{
+	struct timeval start, stop, elapsed;
+	int checksum;
+	
+	/* Allocate the host arrays for rgb and grayscale data */
+	int rgb_size = SIZE * SIZE * sizeof(uint8_t) * 3;
+	int gray_size = SIZE * SIZE * sizeof(uint8_t);
 
-int main(int argc, char** argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s INPUT.png OUTPUT.png\n", argv[0]);
-        return EXIT_FAILURE;
-    }
+	uint8_t *rgb_h = (uint8_t *)malloc(rgb_size);
+	uint8_t *gray_h = (uint8_t *)malloc(gray_size);
 
-    int width = 0;
-    int height = 0;
-    unsigned char* rgb_h = read_rgb_png(argv[1], &width, &height);
-    const int pixels = width * height;
-    const int rgb_bytes = 3 * pixels;
-    const int gray_bytes = pixels;
-    unsigned char* gray_gpu = (unsigned char*)malloc(pixels);
-    if (!gray_gpu) {
-        fprintf(stderr, "Cannot allocate image array\n");
-        exit(EXIT_FAILURE);
-    }
-    unsigned char* gray_reference = (unsigned char*)malloc(pixels);
-    if (!gray_reference) {
-        fprintf(stderr, "Cannot allocate image array\n");
-        exit(EXIT_FAILURE);
-    }
+	/* Initialize the rgb data with something */
+	for(int i=0; i<rgb_size; i++) {
+		rgb_h[i] = i*i % 7;
+	}
 
-    grayscale_cpu(rgb_h, gray_reference, pixels);
+	/********************************************/
+	/* Part 1: CPU Experiment.                  */
+	/********************************************/
+	   
+	/* Mark the stop of the experiment. */
+	gettimeofday(&start,0);
 
-    /*
-     * The _h and _d suffixes are common CUDA naming conventions:
-     * _h means host memory and _d means device memory. They are not part
-     * of the language, but they make each pointer's address space visible.
-     */
-    unsigned char* rgb_d = NULL;
-    unsigned char* gray_d = NULL;
-    check_cuda(cudaMalloc((void**)&rgb_d, rgb_bytes), "cudaMalloc RGB");
-    check_cuda(cudaMalloc((void**)&gray_d, gray_bytes), "cudaMalloc grayscale");
-    check_cuda(cudaMemcpy(rgb_d, rgb_h, rgb_bytes, cudaMemcpyHostToDevice), "copy RGB H2D");
+	rgb_to_grayscale_cpu(rgb_h,gray_h,SIZE,SIZE);
 
-    // A 16x16 block contains 256 threads and maps naturally to a two-dimensional image tile.
-    const dim3 block(16, 16);
-    const dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
-    rgb_to_grayscale_kernel<<<grid, block>>>(rgb_d, gray_d, width, height);
-    check_cuda(cudaGetLastError(), "launch rgb_to_grayscale_kernel");
-    check_cuda(cudaDeviceSynchronize(), "execute rgb_to_grayscale_kernel");
-    check_cuda(cudaMemcpy(gray_gpu, gray_d, gray_bytes, cudaMemcpyDeviceToHost), "copy grayscale D2H");
-    check_cuda(cudaFree(rgb_d), "cudaFree RGB");
-    check_cuda(cudaFree(gray_d), "cudaFree grayscale");
+	/* Mark the stop of the experiment. */
+	gettimeofday(&stop,0);
 
-    const int maximum_difference = maximum_byte_difference(gray_gpu, gray_reference, pixels);
-    write_grayscale_png(argv[2], gray_gpu, width, height);
+	/* Elapsed is the difference between the two */
+	timersub(&stop,&start,&elapsed);
 
-    printf("Input: %s (%dx%d)\n", argv[1], width, height);
-    printf("Block: %ux%u, grid: %ux%u\n", block.x, block.y, grid.x, grid.y);
-    printf("Pixels checked against CPU reference: %d\n", pixels);
-    printf("Output: %s\n", argv[2]);
-    printf("Maximum CPU/GPU difference: %d\n", maximum_difference);
+	/* Compute a final checksum of the results. */
+	for(int i=0; i<gray_size; i++) {
+		checksum += gray_h[i];
+	}
+	
+	printf("cpu elapsed: %u.%0.6u checksum: %d\n",elapsed.tv_sec,elapsed.tv_usec,checksum);
 
-    free(rgb_h);
-    free(gray_gpu);
-    free(gray_reference);
+	/********************************************/
+	/* Part 2: GPU Experiment.                  */
+	/********************************************/
+	   
+	/* Mark the stop of the experiment. */
+	gettimeofday(&start,0);
 
-    return maximum_difference == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+	/* Allocate the device copies for rgb and grayscale */
+	uint8_t *rgb_d = 0;
+	uint8_t *gray_d = 0;
+	
+	CUDA_CHECK(cudaMalloc((void**)&rgb_d,rgb_size));
+	CUDA_CHECK(cudaMalloc((void**)&gray_d,gray_size));
+
+	/* Copy the rgb data over to the device */
+	CUDA_CHECK(cudaMemcpy(rgb_d,rgb_h,rgb_size,cudaMemcpyHostToDevice));
+
+	/* Each 16x16 block uses 256 threads. */
+	/* Make the grid large enough to cover the image. */
+        dim3 block(16, 16);
+        dim3 grid(SIZE/block.x+1,SIZE/block.y+1);
+
+	rgb_to_grayscale_gpu<<<grid,block>>>(rgb_d,gray_d,SIZE,SIZE);
+
+	CUDA_CHECK(cudaGetLastError());
+	CUDA_CHECK(cudaDeviceSynchronize());
+
+	/* Copy the grayscale data back out. */
+	CUDA_CHECK(cudaMemcpy(gray_h,gray_d,gray_size,cudaMemcpyDeviceToHost));
+
+	CUDA_CHECK(cudaFree(rgb_d));
+	CUDA_CHECK(cudaFree(gray_d));
+	
+	/* Mark the stop of the experiment. */
+	gettimeofday(&stop,0);
+
+	/* Elapsed is the difference between the two */
+	timersub(&stop,&start,&elapsed);
+
+	/* Compute a final checksum of the results. */
+	checksum = 0;
+	for(int i=0; i<gray_size; i++) {
+		checksum += gray_h[i];
+	}
+	
+	printf("cuda elapsed: %u.%0.6u checksum: %d\n",elapsed.tv_sec,elapsed.tv_usec,checksum);
+
+	return 0;
+	
 }
