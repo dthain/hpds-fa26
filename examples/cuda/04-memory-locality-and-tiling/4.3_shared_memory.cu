@@ -32,12 +32,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <iomanip>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
-constexpr int kTile = 256;
+const int kTile = 256;
 
 __global__ void global_reuse_kernel(const float* input, float* output) {
     const int tile_start = blockIdx.x * blockDim.x;
@@ -67,99 +65,95 @@ __global__ void shared_reuse_kernel(const float* input, float* output) {
     output[tile_start + threadIdx.x] = sum;
 }
 
-float maximum_difference(const std::vector<float>& a, const std::vector<float>& b) {
+float maximum_difference(const float* a, const float* b, int elements) {
     float result = 0.0f;
-    for (std::size_t i = 0; i < a.size(); ++i) {
+    for (int i = 0; i < elements; ++i) {
         result = std::max(result, std::fabs(a[i] - b[i]));
     }
     return result;
 }
 
 int main() {
-    constexpr int blocks = 4096;
-    constexpr int repetitions = 10;
-    constexpr int measurement_rounds = 5;
-    constexpr std::size_t elements = static_cast<std::size_t>(blocks) * kTile;
-    constexpr std::size_t bytes = elements * sizeof(float);
+    const int blocks = 4096;
+    const int repetitions = 10;
+    const int measurement_rounds = 5;
+    const int elements = blocks * kTile;
+    const int bytes = elements * sizeof(float);
 
-    std::vector<float> input_h(elements);
-    std::vector<float> global_h(elements);
-    std::vector<float> shared_h(elements);
-    for (std::size_t i = 0; i < elements; ++i) {
-        input_h[i] = static_cast<float>(i % 17) * 0.0625f;
+    static float input_h[elements];
+    static float global_h[elements];
+    static float shared_h[elements];
+    for (int i = 0; i < elements; ++i) {
+        input_h[i] = (float)(i % 17) * 0.0625f;
     }
 
-    float* input_d = nullptr;
-    float* global_d = nullptr;
-    float* shared_d = nullptr;
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&input_d), bytes));
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&global_d), bytes));
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&shared_d), bytes));
-    CUDA_CHECK(cudaMemcpy(input_d, input_h.data(), bytes, cudaMemcpyHostToDevice));
+    float* input_d = NULL;
+    float* global_d = NULL;
+    float* shared_d = NULL;
+    CUDA_CHECK(cudaMalloc((void**)&input_d, bytes));
+    CUDA_CHECK(cudaMalloc((void**)&global_d, bytes));
+    CUDA_CHECK(cudaMalloc((void**)&shared_d, bytes));
+    CUDA_CHECK(cudaMemcpy(input_d, input_h, bytes, cudaMemcpyHostToDevice));
 
     global_reuse_kernel<<<blocks, kTile>>>(input_d, global_d);
     shared_reuse_kernel<<<blocks, kTile>>>(input_d, shared_d);
     CUDA_CHECK(cudaGetLastError());
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    std::vector<float> global_samples;
-    std::vector<float> shared_samples;
-    global_samples.reserve(measurement_rounds);
-    shared_samples.reserve(measurement_rounds);
+    float global_samples[measurement_rounds];
+    float shared_samples[measurement_rounds];
 
-    const auto measure_global = [&] {
+    const auto measure_global = [&](int round) {
         const float total_ms = time_cuda_ms([&] {
             for (int repetition = 0; repetition < repetitions; ++repetition) {
                 global_reuse_kernel<<<blocks, kTile>>>(input_d, global_d);
             }
             CUDA_CHECK(cudaGetLastError());
         });
-        global_samples.push_back(total_ms / repetitions);
+        global_samples[round] = total_ms / repetitions;
     };
-    const auto measure_shared = [&] {
+    const auto measure_shared = [&](int round) {
         const float total_ms = time_cuda_ms([&] {
             for (int repetition = 0; repetition < repetitions; ++repetition) {
                 shared_reuse_kernel<<<blocks, kTile>>>(input_d, shared_d);
             }
             CUDA_CHECK(cudaGetLastError());
         });
-        shared_samples.push_back(total_ms / repetitions);
+        shared_samples[round] = total_ms / repetitions;
     };
 
     // Alternate order to reduce systematic clock and thermal bias.
     for (int round = 0; round < measurement_rounds; ++round) {
         if ((round & 1) == 0) {
-            measure_global();
-            measure_shared();
+            measure_global(round);
+            measure_shared(round);
         } else {
-            measure_shared();
-            measure_global();
+            measure_shared(round);
+            measure_global(round);
         }
     }
 
-    CUDA_CHECK(cudaMemcpy(global_h.data(), global_d, bytes, cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(shared_h.data(), shared_d, bytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(global_h, global_d, bytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(shared_h, shared_d, bytes, cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaFree(input_d));
     CUDA_CHECK(cudaFree(global_d));
     CUDA_CHECK(cudaFree(shared_d));
 
-    const float global_ms = median_cuda_ms(global_samples);
-    const float shared_ms = median_cuda_ms(shared_samples);
-    const float max_difference = maximum_difference(global_h, shared_h);
-    const double additions = static_cast<double>(elements) * kTile;
+    const float global_ms = median_cuda_ms(global_samples, measurement_rounds);
+    const float shared_ms = median_cuda_ms(shared_samples, measurement_rounds);
+    const float max_difference = maximum_difference(global_h, shared_h, elements);
+    const double additions = (double)(elements) * kTile;
     const auto giga_additions_per_second = [=](float milliseconds) { return additions / (milliseconds * 1.0e6); };
 
-    std::cout << "Blocks: " << blocks << ", threads/block: " << kTile << ", output elements: " << elements << '\n'
-              << "Modeled global loads/block without reuse: " << kTile * kTile << '\n'
-              << "Modeled global loads/block with reuse: " << kTile << '\n'
-              << "Source-level global-load reduction: " << kTile << "x\n"
-              << "Timing: median of " << measurement_rounds << " rounds, " << repetitions << " launches per round\n\n"
-              << std::left << std::setw(22) << "GPU kernel" << std::right << std::setw(14) << "Time (ms)" << std::setw(18) << "Useful Gadd/s" << '\n'
-              << std::left << std::setw(22) << "Global loads" << std::right << std::setw(14) << global_ms << std::setw(18)
-              << giga_additions_per_second(global_ms) << '\n'
-              << std::left << std::setw(22) << "Shared-memory reuse" << std::right << std::setw(14) << shared_ms << std::setw(18)
-              << giga_additions_per_second(shared_ms) << "\n\n"
-              << "Speedup from shared reuse (global / shared): " << global_ms / shared_ms << "x\n"
-              << "Maximum absolute difference: " << max_difference << '\n';
+    printf("Blocks: %d, threads/block: %d, output elements: %d\n", blocks, kTile, elements);
+    printf("Modeled global loads/block without reuse: %d\n", kTile * kTile);
+    printf("Modeled global loads/block with reuse: %d\n", kTile);
+    printf("Source-level global-load reduction: %dx\n", kTile);
+    printf("Timing: median of %d rounds, %d launches per round\n\n", measurement_rounds, repetitions);
+    printf("%-22s%14s%18s\n", "GPU kernel", "Time (ms)", "Useful Gadd/s");
+    printf("%-22s%14.6g%18.6g\n", "Global loads", global_ms, giga_additions_per_second(global_ms));
+    printf("%-22s%14.6g%18.6g\n\n", "Shared-memory reuse", shared_ms, giga_additions_per_second(shared_ms));
+    printf("Speedup from shared reuse (global / shared): %.6gx\n", global_ms / shared_ms);
+    printf("Maximum absolute difference: %.6g\n", max_difference);
     return max_difference == 0.0f ? EXIT_SUCCESS : EXIT_FAILURE;
 }

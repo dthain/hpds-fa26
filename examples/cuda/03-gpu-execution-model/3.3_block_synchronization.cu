@@ -28,11 +28,10 @@
 
 #include <cuda_runtime.h>
 
-#include <cstdlib>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
-constexpr int kBlockSize = 32;
+const int kBlockSize = 32;
 
 __global__ void neighbor_exchange_kernel(int* output) {
     /*
@@ -58,20 +57,20 @@ __global__ void neighbor_exchange_kernel(int* output) {
 }
 
 int main() {
-    std::vector<int> output_h(kBlockSize);
-    int* output_d = nullptr;
-    const std::size_t bytes = output_h.size() * sizeof(int);
-    cudaError_t error = cudaMalloc(reinterpret_cast<void**>(&output_d), bytes);
+    static int output_h[kBlockSize];
+    int* output_d = NULL;
+    const int bytes = kBlockSize * sizeof(int);
+    cudaError_t error = cudaMalloc((void**)&output_d, bytes);
     if (error == cudaSuccess) {
         neighbor_exchange_kernel<<<1, kBlockSize>>>(output_d);
         error = cudaDeviceSynchronize();
     }
     if (error == cudaSuccess) {
-        error = cudaMemcpy(output_h.data(), output_d, bytes, cudaMemcpyDeviceToHost);
+        error = cudaMemcpy(output_h, output_d, bytes, cudaMemcpyDeviceToHost);
     }
     cudaFree(output_d);
     if (error != cudaSuccess) {
-        std::cerr << cudaGetErrorString(error) << '\n';
+        fprintf(stderr, "%s\n", cudaGetErrorString(error));
         return EXIT_FAILURE;
     }
 
@@ -82,7 +81,7 @@ int main() {
     }
     for (int lane = 0; lane < kBlockSize; ++lane) {
         const int left_lane = (lane + kBlockSize - 1) % kBlockSize;
-        std::cout << "Thread " << lane << " received " << output_h[lane] << " from thread " << left_lane << '\n';
+        printf("Thread %d received %d from thread %d\n", lane, output_h[lane], left_lane);
     }
     return correct ? EXIT_SUCCESS : EXIT_FAILURE;
 }

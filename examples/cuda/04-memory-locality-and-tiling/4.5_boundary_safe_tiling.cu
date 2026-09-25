@@ -34,11 +34,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
-constexpr int kTile = 16;
+const int kTile = 16;
 
 
 __global__ void tiled_matmul_rectangular(const float* a, const float* b, float* c, int m, int k_size, int n) {
@@ -71,7 +70,7 @@ __global__ void tiled_matmul_rectangular(const float* a, const float* b, float* 
     }
 }
 
-void matmul_cpu(const std::vector<float>& a, const std::vector<float>& b, std::vector<float>& c, int m, int k_size, int n) {
+void matmul_cpu(const float* a, const float* b, float* c, int m, int k_size, int n) {
     for (int row = 0; row < m; ++row) {
         for (int col = 0; col < n; ++col) {
             float sum = 0.0f;
@@ -84,51 +83,51 @@ void matmul_cpu(const std::vector<float>& a, const std::vector<float>& b, std::v
 }
 
 int main() {
-    constexpr int m = 37;
-    constexpr int k_size = 29;
-    constexpr int n = 41;
-    std::vector<float> a_h(m * k_size);
-    std::vector<float> b_h(k_size * n);
-    std::vector<float> expected_h(m * n);
-    std::vector<float> c_h(m * n);
-    for (std::size_t i = 0; i < a_h.size(); ++i)
+    const int m = 37;
+    const int k_size = 29;
+    const int n = 41;
+    static float a_h[m * k_size];
+    static float b_h[k_size * n];
+    static float expected_h[m * n];
+    static float c_h[m * n];
+    for (int i = 0; i < (m * k_size); ++i)
         a_h[i] = (i % 9) * 0.125f;
-    for (std::size_t i = 0; i < b_h.size(); ++i)
+    for (int i = 0; i < (k_size * n); ++i)
         b_h[i] = (i % 7) * 0.25f - 0.5f;
     matmul_cpu(a_h, b_h, expected_h, m, k_size, n);
 
-    float* a_d = nullptr;
-    float* b_d = nullptr;
-    float* c_d = nullptr;
-    const std::size_t a_bytes = a_h.size() * sizeof(float);
-    const std::size_t b_bytes = b_h.size() * sizeof(float);
-    const std::size_t c_bytes = c_h.size() * sizeof(float);
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&a_d), a_bytes), "cudaMalloc A");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&b_d), b_bytes), "cudaMalloc B");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&c_d), c_bytes), "cudaMalloc C");
-    check_cuda(cudaMemcpy(a_d, a_h.data(), a_bytes, cudaMemcpyHostToDevice), "copy A H2D");
-    check_cuda(cudaMemcpy(b_d, b_h.data(), b_bytes, cudaMemcpyHostToDevice), "copy B H2D");
+    float* a_d = NULL;
+    float* b_d = NULL;
+    float* c_d = NULL;
+    const int a_bytes = (m * k_size) * sizeof(float);
+    const int b_bytes = (k_size * n) * sizeof(float);
+    const int c_bytes = (m * n) * sizeof(float);
+    check_cuda(cudaMalloc((void**)&a_d, a_bytes), "cudaMalloc A");
+    check_cuda(cudaMalloc((void**)&b_d, b_bytes), "cudaMalloc B");
+    check_cuda(cudaMalloc((void**)&c_d, c_bytes), "cudaMalloc C");
+    check_cuda(cudaMemcpy(a_d, a_h, a_bytes, cudaMemcpyHostToDevice), "copy A H2D");
+    check_cuda(cudaMemcpy(b_d, b_h, b_bytes, cudaMemcpyHostToDevice), "copy B H2D");
     const dim3 block(kTile, kTile);
     const dim3 grid((n + kTile - 1) / kTile, (m + kTile - 1) / kTile);
     tiled_matmul_rectangular<<<grid, block>>>(a_d, b_d, c_d, m, k_size, n);
     check_cuda(cudaGetLastError(), "launch tiled_matmul_rectangular");
     check_cuda(cudaDeviceSynchronize(), "execute tiled_matmul_rectangular");
-    check_cuda(cudaMemcpy(c_h.data(), c_d, c_bytes, cudaMemcpyDeviceToHost), "copy C D2H");
+    check_cuda(cudaMemcpy(c_h, c_d, c_bytes, cudaMemcpyDeviceToHost), "copy C D2H");
     check_cuda(cudaFree(a_d), "cudaFree A");
     check_cuda(cudaFree(b_d), "cudaFree B");
     check_cuda(cudaFree(c_d), "cudaFree C");
 
     float max_error = 0.0f;
-    for (std::size_t i = 0; i < c_h.size(); ++i) {
+    for (int i = 0; i < (m * n); ++i) {
         max_error = std::max(max_error, std::fabs(c_h[i] - expected_h[i]));
     }
-    const std::size_t output_threads = static_cast<std::size_t>(grid.x) * grid.y * block.x * block.y;
-    std::cout << "A: " << m << 'x' << k_size << ", B: " << k_size << 'x' << n << '\n'
-              << "Tile: " << kTile << 'x' << kTile << ", phases: " << (k_size + kTile - 1) / kTile << '\n'
-              << "Grid: " << grid.x << 'x' << grid.y << " blocks\n"
-              << "Valid outputs: " << static_cast<std::size_t>(m) * n << '\n'
-              << "Threads outside C boundary: " << output_threads - static_cast<std::size_t>(m) * n << '\n'
-              << "All valid outputs checked against CPU reference.\n"
-              << "Maximum absolute error: " << max_error << '\n';
+    const int output_threads = (int)(grid.x) * grid.y * block.x * block.y;
+    printf("A: %dx%d, B: %dx%d\n", m, k_size, k_size, n);
+    printf("Tile: %dx%d, phases: %d\n", kTile, kTile, (k_size + kTile - 1) / kTile);
+    printf("Grid: %ux%u blocks\n", grid.x, grid.y);
+    printf("Valid outputs: %d\n", m * n);
+    printf("Threads outside C boundary: %d\n", output_threads - m * n);
+    printf("All valid outputs checked against CPU reference.\n");
+    printf("Maximum absolute error: %.6g\n", max_error);
     return max_error <= 1.0e-4f ? EXIT_SUCCESS : EXIT_FAILURE;
 }

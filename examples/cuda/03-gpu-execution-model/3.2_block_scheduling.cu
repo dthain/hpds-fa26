@@ -25,9 +25,8 @@
 
 #include <cuda_runtime.h>
 
-#include <cstdlib>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
 __global__ void independent_blocks_kernel(int* output, int elements) {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -50,24 +49,24 @@ int main() {
     const int elements = 1000;
     const int block_size = 64;
     const int grid_size = (elements + block_size - 1) / block_size;
-    const std::size_t bytes = elements * sizeof(int);
+    const int bytes = elements * sizeof(int);
 
-    std::vector<int> output_h(elements);
-    int* output_d = nullptr;
-    cudaError_t error = cudaMalloc(reinterpret_cast<void**>(&output_d), bytes);
+    static int output_h[elements];
+    int* output_d = NULL;
+    cudaError_t error = cudaMalloc((void**)&output_d, bytes);
     if (error != cudaSuccess) {
-        std::cerr << cudaGetErrorString(error) << '\n';
+        fprintf(stderr, "%s\n", cudaGetErrorString(error));
         return EXIT_FAILURE;
     }
 
     independent_blocks_kernel<<<grid_size, block_size>>>(output_d, elements);
     error = cudaDeviceSynchronize();
     if (error == cudaSuccess) {
-        error = cudaMemcpy(output_h.data(), output_d, bytes, cudaMemcpyDeviceToHost);
+        error = cudaMemcpy(output_h, output_d, bytes, cudaMemcpyDeviceToHost);
     }
     cudaFree(output_d);
     if (error != cudaSuccess) {
-        std::cerr << cudaGetErrorString(error) << '\n';
+        fprintf(stderr, "%s\n", cudaGetErrorString(error));
         return EXIT_FAILURE;
     }
 
@@ -75,6 +74,7 @@ int main() {
     for (int i = 0; i < elements; ++i) {
         correct = correct && (output_h[i] == 3 * i + 1);
     }
-    std::cout << "Blocks launched: " << grid_size << '\n' << "The printed block order is not part of program semantics.\n";
+    printf("Blocks launched: %d\n", grid_size);
+    printf("The printed block order is not part of program semantics.\n");
     return correct ? EXIT_SUCCESS : EXIT_FAILURE;
 }

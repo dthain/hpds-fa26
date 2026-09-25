@@ -37,9 +37,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
 
 __global__ void matmul_kernel(const float* a, const float* b, float* c, int m, int k_size, int n) {
@@ -63,7 +62,7 @@ __global__ void matmul_kernel(const float* a, const float* b, float* c, int m, i
     }
 }
 
-void matmul_cpu(const std::vector<float>& a, const std::vector<float>& b, std::vector<float>& c, int m, int k_size, int n) {
+void matmul_cpu(const float* a, const float* b, float* c, int m, int k_size, int n) {
     for (int row = 0; row < m; ++row) {
         for (int col = 0; col < n; ++col) {
             float sum = 0.0f;
@@ -84,46 +83,47 @@ int main() {
     const int k_size = 511;
     const int n = 515;
 
-    std::vector<float> a_h(m * k_size);
-    std::vector<float> b_h(k_size * n);
-    std::vector<float> expected_h(m * n);
-    std::vector<float> c_h(m * n);
-    for (std::size_t i = 0; i < a_h.size(); ++i) {
-        a_h[i] = static_cast<float>(i % 7) - 3.0f;
+    static float a_h[m * k_size];
+    static float b_h[k_size * n];
+    static float expected_h[m * n];
+    static float c_h[m * n];
+    for (int i = 0; i < (m * k_size); ++i) {
+        a_h[i] = (float)(i % 7) - 3.0f;
     }
-    for (std::size_t i = 0; i < b_h.size(); ++i) {
-        b_h[i] = static_cast<float>(i % 5) * 0.5f;
+    for (int i = 0; i < (k_size * n); ++i) {
+        b_h[i] = (float)(i % 5) * 0.5f;
     }
     matmul_cpu(a_h, b_h, expected_h, m, k_size, n);
 
-    float* a_d = nullptr;
-    float* b_d = nullptr;
-    float* c_d = nullptr;
-    const std::size_t a_bytes = a_h.size() * sizeof(float);
-    const std::size_t b_bytes = b_h.size() * sizeof(float);
-    const std::size_t c_bytes = c_h.size() * sizeof(float);
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&a_d), a_bytes), "cudaMalloc A");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&b_d), b_bytes), "cudaMalloc B");
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&c_d), c_bytes), "cudaMalloc C");
-    check_cuda(cudaMemcpy(a_d, a_h.data(), a_bytes, cudaMemcpyHostToDevice), "copy A H2D");
-    check_cuda(cudaMemcpy(b_d, b_h.data(), b_bytes, cudaMemcpyHostToDevice), "copy B H2D");
+    float* a_d = NULL;
+    float* b_d = NULL;
+    float* c_d = NULL;
+    const int a_bytes = (m * k_size) * sizeof(float);
+    const int b_bytes = (k_size * n) * sizeof(float);
+    const int c_bytes = (m * n) * sizeof(float);
+    check_cuda(cudaMalloc((void**)&a_d, a_bytes), "cudaMalloc A");
+    check_cuda(cudaMalloc((void**)&b_d, b_bytes), "cudaMalloc B");
+    check_cuda(cudaMalloc((void**)&c_d, c_bytes), "cudaMalloc C");
+    check_cuda(cudaMemcpy(a_d, a_h, a_bytes, cudaMemcpyHostToDevice), "copy A H2D");
+    check_cuda(cudaMemcpy(b_d, b_h, b_bytes, cudaMemcpyHostToDevice), "copy B H2D");
 
     const dim3 block(16, 16);
     const dim3 grid((n + block.x - 1) / block.x, (m + block.y - 1) / block.y);
     matmul_kernel<<<grid, block>>>(a_d, b_d, c_d, m, k_size, n);
     check_cuda(cudaGetLastError(), "launch matmul_kernel");
     check_cuda(cudaDeviceSynchronize(), "execute matmul_kernel");
-    check_cuda(cudaMemcpy(c_h.data(), c_d, c_bytes, cudaMemcpyDeviceToHost), "copy C D2H");
+    check_cuda(cudaMemcpy(c_h, c_d, c_bytes, cudaMemcpyDeviceToHost), "copy C D2H");
     check_cuda(cudaFree(a_d), "cudaFree A");
     check_cuda(cudaFree(b_d), "cudaFree B");
     check_cuda(cudaFree(c_d), "cudaFree C");
 
     float max_abs_error = 0.0f;
-    for (std::size_t i = 0; i < c_h.size(); ++i) {
+    for (int i = 0; i < (m * n); ++i) {
         max_abs_error = std::max(max_abs_error, std::fabs(c_h[i] - expected_h[i]));
     }
-    std::cout << "A: " << m << 'x' << k_size << ", B: " << k_size << 'x' << n << ", C: " << m << 'x' << n << '\n'
-              << "Outputs checked against CPU reference: " << c_h.size() << '\n' << "Maximum absolute error: " << max_abs_error << '\n';
+    printf("A: %dx%d, B: %dx%d, C: %dx%d\n", m, k_size, k_size, n, m, n);
+    printf("Outputs checked against CPU reference: %d\n", (m * n));
+    printf("Maximum absolute error: %.6g\n", max_abs_error);
     return max_abs_error <= 1.0e-4f ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

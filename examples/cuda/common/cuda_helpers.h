@@ -46,3 +46,8 @@ inline float median_cuda_ms(std::vector<float> samples) {
     std::sort(samples.begin(), samples.end());
     return samples[samples.size() / 2];
 }
+
+inline float median_cuda_ms(float* samples, int count) {
+    std::sort(samples, samples + count);
+    return samples[count / 2];
+}

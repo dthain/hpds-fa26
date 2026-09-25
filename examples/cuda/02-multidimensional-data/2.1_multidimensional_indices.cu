@@ -35,9 +35,8 @@
 #include "../common/cuda_helpers.h"
 
 #include <algorithm>
-#include <cstdlib>
-#include <iostream>
-#include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
 
 __global__ void flatten_3d_kernel(int* offsets, int width, int height, int depth) {
@@ -52,7 +51,7 @@ __global__ void flatten_3d_kernel(int* offsets, int width, int height, int depth
     }
 }
 
-void flatten_3d_cpu(std::vector<int>& offsets, int width, int height, int depth) {
+void flatten_3d_cpu(int* offsets, int width, int height, int depth) {
     for (int plane = 0; plane < depth; ++plane) {
         for (int row = 0; row < height; ++row) {
             for (int col = 0; col < width; ++col) {
@@ -68,9 +67,9 @@ int main() {
     const int height = 3;
     const int depth = 2;
     const int element_count = width * height * depth;
-    const std::size_t bytes = static_cast<std::size_t>(element_count) * sizeof(int);
-    std::vector<int> cpu_offsets(element_count);
-    std::vector<int> gpu_offsets(element_count);
+    const int bytes = element_count * sizeof(int);
+    static int cpu_offsets[element_count];
+    static int gpu_offsets[element_count];
 
     flatten_3d_cpu(cpu_offsets, width, height, depth);
 
@@ -81,13 +80,13 @@ int main() {
     const dim3 block(2, 2, 2);
     const dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y, (depth + block.z - 1) / block.z);
 
-    int* device_offsets = nullptr;
-    check_cuda(cudaMalloc(reinterpret_cast<void**>(&device_offsets), bytes), "cudaMalloc offsets");
+    int* device_offsets = NULL;
+    check_cuda(cudaMalloc((void**)&device_offsets, bytes), "cudaMalloc offsets");
 
     flatten_3d_kernel<<<grid, block>>>(device_offsets, width, height, depth);
     check_cuda(cudaGetLastError(), "launch flatten_3d_kernel");
     check_cuda(cudaDeviceSynchronize(), "execute flatten_3d_kernel");
-    check_cuda(cudaMemcpy(gpu_offsets.data(), device_offsets, bytes, cudaMemcpyDeviceToHost), "copy offsets D2H");
+    check_cuda(cudaMemcpy(gpu_offsets, device_offsets, bytes, cudaMemcpyDeviceToHost), "copy offsets D2H");
     check_cuda(cudaFree(device_offsets), "cudaFree offsets");
 
     int maximum_difference = 0;
@@ -95,17 +94,19 @@ int main() {
         maximum_difference = std::max(maximum_difference, std::abs(gpu_offsets[i] - cpu_offsets[i]));
     }
 
-    std::cout << "Data shape (depth,height,width): (" << depth << ',' << height << ',' << width << ")\n" << "CUDA grid (x,y,z): (" << grid.x << ',' << grid.y << ',' << grid.z << ")\n"
-              << "CUDA block (x,y,z): (" << block.x << ',' << block.y << ',' << block.z << ")\n";
+    printf("Data shape (depth,height,width): (%d,%d,%d)\n", depth, height, width);
+    printf("CUDA grid (x,y,z): (%u,%u,%u)\n", grid.x, grid.y, grid.z);
+    printf("CUDA block (x,y,z): (%u,%u,%u)\n", block.x, block.y, block.z);
     for (int plane = 0; plane < depth; ++plane) {
         for (int row = 0; row < height; ++row) {
             for (int col = 0; col < width; ++col) {
                 const int offset = (plane * height + row) * width + col;
-                std::cout << "data=(plane=" << plane << ",row=" << row << ",col=" << col << ") -> offset=" << gpu_offsets[offset] << '\n';
+                printf("data=(plane=%d,row=%d,col=%d) -> offset=%d\n", plane, row, col, gpu_offsets[offset]);
             }
         }
     }
-    std::cout << "Coordinates checked: " << element_count << '\n' << "Maximum CPU/GPU offset difference: " << maximum_difference << '\n';
+    printf("Coordinates checked: %d\n", element_count);
+    printf("Maximum CPU/GPU offset difference: %d\n", maximum_difference);
 
     return maximum_difference == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
