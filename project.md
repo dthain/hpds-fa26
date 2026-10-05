@@ -71,15 +71,17 @@ Your final paper should be a highly polished technical document
 formatted using the [ACM Conference Proceedings template](https://www.overleaf.com/latex/templates/acm-conference-proceedings-primary-article-template/wbvnghjbzwpc)
 
 Your paper should be written for an audience that is scientifically literate
-and familar with computing, but is not already familiar with the specific
+and familar with computing, but is not already familiar with your specific
 research area.
 
 **Your words must be your own.  You may not use AI of any kind to generate
-text in this paper.  Expect to spend time drafting, revising, and revising again.  **
-Your writing style should be straightforward and focused.
-There is no specific length requirement -- explain what needs to be explained.
-With that said:
+text in this paper.  Expect to spend time drafting, revising, and revising again.**
 
+Your writing style should be straightforward and focused.
+There is no specific length requirement: explain what needs to be explained
+and don't add "fluff" to make it more verbose.
+With that said: a paper of less than 8 pages is probably not adequately
+explaining the details, while a paper of more than 20 pages is probably too long winded.
 
 It should consist of the following major sections:
 
