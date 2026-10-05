@@ -1,11 +1,13 @@
-# Course Projects
+# Course Project Starting Points
 
-Starter projects from research groups at Notre Dame. Each one has a contact
-in the group who can meet with you to go over the science and the code.
+Each of these is a "starting point" for an application, drawn from
+research groups at Notre Dame.   Once you have matched with a project,
+it will be necessary to make an appointment with the project sponsor
+to develop a 
 
-Each folder has the code (or a pointer to it), a small input, and scripts for
+For many of these, we have some examples code, a small input, and scripts for
 a minimal run on CRC. That run is only a starting point. What to scale up,
-what to measure, and what to improve is up to you.
+what to measure, and what to improve is for you to develop.
 
 Clone the course repository with its submodules:
 
@@ -19,7 +21,7 @@ If you already cloned it without them:
 git submodule update --init --recursive
 ```
 
-## Projects
+## Project List
 
 - Name: [CM1LP](cm1lp/)
   Contact: David Richter (`David.Richter.26@nd.edu`)
@@ -57,10 +59,8 @@ git submodule update --init --recursive
   Code: <https://github.com/NirjharBhattacharyya/Bulk_Segregation_Analysis_Ferdig_Lab>. The repository is private, ask Nirjhar for access.
   Data: a SNP table with 12,803 variants in `bsa-variant-analysis/data/`.
 
-## Other directions
+- [NA61 ROOT Analysis](na61-root-analysis/): C++/ROOT event selection for the NA61 experiment at CERN, used for NuMI neutrino-flux estimation. Contact Michael Quintieri (`mquintie@nd.edu`) and Laura Fields (`lfields2@nd.edu`) for data and code access.
 
-These have a contact, but code and data are not available yet.
+- [Subgraph Isomorphism](subgraph-isomorphism/): subgraph-isomorphism codes used to compare an FPGA-oriented system with conventional HPC systems. Contact Peter Kogge (`Peter.M.Kogge.1@nd.edu`) for data and code access.
 
-- [NA61 ROOT Analysis](na61-root-analysis/): C++/ROOT event selection for the NA61 experiment at CERN, used for NuMI neutrino-flux estimation. Michael Quintieri (`mquintie@nd.edu`) and Laura Fields (`lfields2@nd.edu`).
-- [Subgraph Isomorphism](subgraph-isomorphism/): subgraph-isomorphism codes used to compare an FPGA-oriented system with conventional HPC systems. Peter Kogge (`Peter.M.Kogge.1@nd.edu`).
-- [Persistent Homology / TDA](persistent-homology/): high-performance topological data analysis. Peter Kogge (`Peter.M.Kogge.1@nd.edu`).
+- [Persistent Homology / TDA](persistent-homology/): high-performance topological data analysis. Peter Kogge (`Peter.M.Kogge.1@nd.edu`) for data and code access.
