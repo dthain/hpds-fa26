@@ -1,26 +1,27 @@
 # Course Project - CSE 60772 Fall 2026
 
+## Project Starting Points
+
+Here are the [project starting points](projects/index.md) for bidding.
+
+## Project Overview
+
 The course project will be an extensive undertaking in the second half of the semester, in which you will either analyze and improve an existing scientific application, or develop a new application in your area of expertise.  Either way, the project will provide an opportunity for you to develop and demonstrate skills in
 analyzing, optmizing, and describing a complex application.
 
-Each project must involve each of the following elements:
-- **Local Parallelism** -  The application must make use of multicore, GPU, or other accelerator devices to make maximum use of parallelism on a single node.  OpenMP and CUDA are good choices, but you may make use of any other appropriate framework for local parallelism.  You will establish a performance baseline,
-propose an improvement to the local parallel strategy, and then measure and
-report on the improvement.
-- **Distributed Parallelism** - The application must also make use of distributed parallelism across mulitple nodes.  Makeflow, TaskVine, or MPI are good choices, but again you may choose any appropriate framework for distribution. The application should on an HPC cluster such as the Notre Dame CRC or Purdue Anvil.
-In a similar way,   You will establish a performance baseline,
-propose an improvement to the distributed strategy, and then measure and
-report on the improvement.
-- **Insightful Documentation** - The primary project deliverable will consist
-of extensive technical documentation that explains the scientific purpose,
-technical architecture, baseline performance, optimization approach,
-and performance results.  This document will be developed piecewise over the
+The primary project deliverable will consist
+of an **extensive technical paper** that explains the scientific purpose,
+technical architecture, local parallelism, distributed parallelism,
+and performance results of your work.
+This document will be developed piecewise over the
 course of the project, and revised through multiple steps, resulting in
-a substantial technical paper suitable for submission to a conference or journal.
+a high quality paper suitable for submission to a conference or journal.
+You will also turn in the code, data, and scripts used to generate
+your results.
 
 Each project will be conducted in **teams of two** so that you have ample
-opportunity to discuss technical problems, 
-with the following stages and deadlines:
+opportunity to work together on software development, writing and revising,
+and solving technical problems.  Here are the project stages and deadlines:
 
 - **Project Bids** (Oct 12)  Identify a partner you would like to work with,
 read over the brief project descriptions and links, and send an ordered
@@ -63,10 +64,6 @@ although it is ok if there are a few loose ends remaining.)
 - **Final Submission** - Dec 9 at 5:00PM - Turn in the final version of your paper
 in PDF form along with a link to your project repository containing all
 code, data, scripts, and graphs.
-
-## Project Starting Points
-
-Here are the [project starting points](projects/index.md) for bidding.
 
 ## Paper Organization
 
