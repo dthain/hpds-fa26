@@ -15,7 +15,7 @@ and to accept the xmin,xmax,ymin,ymax coordinates on the command line.
 Measure the time to execute the sequential version, and note the size of the
 output file produced.
 
-2 - Use this online [mandelbrot explorer] to select an interesting portion
+2 - Use this online [mandelbrot explorer](https://math.hws.edu/eck/js/mandelbrot/MB.html) to select an interesting portion
 of the mandelbrot set.  (Zoom in at least 10 times or more, until the tool
 starts to show poor resolution.)  Use the "Show XML" button to extract the
 boundaries of the zoomed in image.
