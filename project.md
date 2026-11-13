@@ -127,4 +127,12 @@ Suggest ideas for future improvements to the application.
 
 ## Presentation Organization
 
-(more information to follow)
+During the final two weeks of class, you will give a **fifteen minute** presentation to the whole class. The talk should follow the general structure of the paper, giving an overview of the scientific objective, technical architecture, local parallelism, distributed parallelism, and your results from evaluation the system so far.  Each member of the group should speak for part of the time. Your talk should be accompanied by 10-15 carefully designed and edited slides.  Avoid displaying simple bulleted lists.  Your slides should be full of detailed diagrams that convey the details and performance of how your systems work.
+
+Of course, it's not possible for everyone to speak on the last day.  If you have one of the earlier speaking slots, its ok if you are missing a few distributed system results that will appear in the final paper.  But you should still have a lot to say about the operation of the system and your local performance results.  If you have one of the later speaking slots, your results should be largely complete. 
+
+While this is a short talk, it will require careful preparation in order to be detailed, informative, and on time. Practice multiple times together so that you can consistently finish between 14m30s and 14m59s. Following each talk, there will be two minutes for questions from the audience. In the meantime, the next group should come up to the podium and load the next slide deck.
+
+Attendance will be taken during project talks, and will count for a portion of your grade. Please show courtesy to your classmates by arriving on time and giving them your attention.
+
+To ensure a minimum of technical difficulties, please prepare your slides using Google Slides, make sure it is readable by anyone with the link, and email Prof. Thain with the link no later than 5PM the day before the presentation. (It’s fine if you continue to update the presentation after that point, but I need the link to assemble the schedule.)
