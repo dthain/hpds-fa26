@@ -136,3 +136,12 @@ While this is a short talk, it will require careful preparation in order to be d
 Attendance will be taken during project talks, and will count for a portion of your grade. Please show courtesy to your classmates by arriving on time and giving them your attention.
 
 To ensure a minimum of technical difficulties, please prepare your slides using Google Slides, make sure it is readable by anyone with the link, and email Prof. Thain with the link no later than 5PM the day before the presentation. (It’s fine if you continue to update the presentation after that point, but I need the link to assemble the schedule.)
+
+## Final Project Submission
+
+Submit your final paper as a PDF via Canvas by 7:30PM on Friday, December 9th.
+
+Your paper should clearly indicate the URL of your github repository with code and results.
+Make sure that the repository is private and shared with Prof. Thain and TA Jin.
+(It's ok if this is the same repository as your earlier assignments.)
+
