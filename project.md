@@ -61,7 +61,7 @@ to result in a clear and informative performance.
 (Your technical results should be largely complete at this point,
 although it is ok if there are a few loose ends remaining.)
 
-- **Final Submission** - Dec 9 at 5:00PM - Turn in the final version of your paper
+- **Final Submission** - Dec 11 at 7:30PM - Turn in the final version of your paper
 in PDF form along with a link to your project repository containing all
 code, data, scripts, and graphs.
 
@@ -139,7 +139,7 @@ To ensure a minimum of technical difficulties, please prepare your slides using 
 
 ## Final Project Submission
 
-Submit your final paper as a PDF via Canvas by 7:30PM on Friday, December 9th.
+Submit your final paper as a PDF via Canvas by 7:30PM on Friday, December 11th.
 
 Your paper should clearly indicate the URL of your github repository with code and results.
 Make sure that the repository is private and shared with Prof. Thain and TA Jin.
