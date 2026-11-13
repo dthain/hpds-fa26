@@ -56,7 +56,7 @@ At this point, sections 2, 3, and 4 should be largely complete, and
 any comments received from the first checkpoint should have been addressed.
 
 - **Class Presentation** - Nov 30 - Dec 7 - Give a highly polished
-15-minute in-class presentation with slides that gives an overview of the scientific objective, technical architecture, local performance, and distributed performance of your application.  This presentation will require preparation and practice
+20-minute in-class presentation with slides that gives an overview of the scientific objective, technical architecture, local performance, and distributed performance of your application.  This presentation will require preparation and practice
 to result in a clear and informative performance.
 (Your technical results should be largely complete at this point,
 although it is ok if there are a few loose ends remaining.)
@@ -127,7 +127,7 @@ Suggest ideas for future improvements to the application.
 
 ## Presentation Organization
 
-During the final two weeks of class, you will give a **twenty minute** presentation to the whole class. The talk should follow the general structure of the paper, giving an overview of the scientific objective, technical architecture, local parallelism, distributed parallelism, and your results from evaluation the system so far.  Each member of the group should speak for part of the time. Your talk should be accompanied by 10-15 carefully designed and edited slides.  Avoid displaying simple bulleted lists.  Your slides should be full of detailed diagrams that convey the details and performance of how your systems work.
+During the final two weeks of class, you will give a **twenty minute** presentation to the whole class. The talk should follow the general structure of the paper, giving an overview of the scientific objective, technical architecture, local parallelism, distributed parallelism, and your results from evaluation the system so far.  Each member of the group should speak for part of the time. Your talk should be accompanied by 15-20 carefully designed and edited slides.  Avoid displaying simple bulleted lists.  Your slides should be full of detailed diagrams that convey the details and performance of how your systems work.
 
 Of course, it's not possible for everyone to speak on the last day.  If you have one of the earlier speaking slots, its ok if you are missing a few distributed system results that will appear in the final paper.  But you should still have a lot to say about the operation of the system and your local performance results.  If you have one of the later speaking slots, your results should be largely complete. 
 
