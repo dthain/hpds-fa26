@@ -131,7 +131,7 @@ During the final two weeks of class, you will give a **twenty minute** presentat
 
 Of course, it's not possible for everyone to speak on the last day.  If you have one of the earlier speaking slots, its ok if you are missing a few distributed system results that will appear in the final paper.  But you should still have a lot to say about the operation of the system and your local performance results.  If you have one of the later speaking slots, your results should be largely complete. 
 
-While this is a short talk, it will require careful preparation in order to be detailed, informative, and on time. Practice multiple times together so that you can consistently finish between 14m30s and 14m59s. Following each talk, there will be two minutes for questions from the audience. In the meantime, the next group should come up to the podium and load the next slide deck.
+While this is a short talk, it will require careful preparation in order to be detailed, informative, and on time. Practice multiple times together so that you can consistently finish between 19m30s and 19m59s. Following each talk, there will be two minutes for questions from the audience. In the meantime, the next group should come up to the podium and load the next slide deck.
 
 Attendance will be taken during project talks, and will count for a portion of your grade. Please show courtesy to your classmates by arriving on time and giving them your attention.
 
